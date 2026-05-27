@@ -157,47 +157,56 @@ export function CompareClient({ models }: { models: Model[] }) {
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-4 flex-wrap">
-        {/* View toggle */}
-        <Tabs
-          value={viewMode}
-          onValueChange={(v) => setViewMode(v as ViewMode)}
-        >
-          <TabsList>
-            <TabsTrigger value="table">{t.view.table}</TabsTrigger>
-            <TabsTrigger value="chart">{t.view.chart}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="flex items-center gap-5 flex-wrap">
+        <ControlGroup label="视图">
+          <Tabs
+            value={viewMode}
+            onValueChange={(v) => setViewMode(v as ViewMode)}
+          >
+            <TabsList>
+              <TabsTrigger value="table">{t.view.table}</TabsTrigger>
+              <TabsTrigger value="chart">{t.view.chart}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </ControlGroup>
 
-        {/* Metric toggle */}
-        <Tabs
-          value={metric}
-          onValueChange={(v) => setMetric(v as Metric)}
-        >
-          <TabsList>
-            <TabsTrigger value="tokens">{t.metric.tokens}</TabsTrigger>
-            <TabsTrigger value="requests">{t.metric.requests}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <ControlGroup label="指标">
+          <Tabs
+            value={metric}
+            onValueChange={(v) => setMetric(v as Metric)}
+          >
+            <TabsList>
+              <TabsTrigger value="tokens">{t.metric.tokens}</TabsTrigger>
+              <TabsTrigger value="requests">{t.metric.requests}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </ControlGroup>
 
-        {/* Time range */}
-        <Tabs
-          value={String(days)}
-          onValueChange={(v) => setDays(Number(v) as TimeRange)}
-        >
-          <TabsList>
-            <TabsTrigger value="7">{t.range.days7}</TabsTrigger>
-            <TabsTrigger value="14">{t.range.days14}</TabsTrigger>
-            <TabsTrigger value="30">{t.range.days30}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <ControlGroup label="时间">
+          <Tabs
+            value={String(days)}
+            onValueChange={(v) => setDays(Number(v) as TimeRange)}
+          >
+            <TabsList>
+              <TabsTrigger value="7">{t.range.days7}</TabsTrigger>
+              <TabsTrigger value="14">{t.range.days14}</TabsTrigger>
+              <TabsTrigger value="30">{t.range.days30}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </ControlGroup>
       </div>
 
       {/* Content area */}
       {loading ? (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
-          <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
+          <div className="flex items-center justify-center h-[300px] text-[#6B7785]">
             {t.common.loading}
+          </div>
+        </div>
+      ) : selectedModels.length === 0 ? (
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+          <div className="flex items-center justify-center h-[200px] text-[#94A0AE]">
+            请勾选至少一个模型
           </div>
         </div>
       ) : viewMode === "table" ? (
@@ -268,6 +277,25 @@ export function CompareClient({ models }: { models: Model[] }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Sub-components ─────────────────────────────────
+
+function ControlGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-medium text-[#94A0AE] shrink-0">
+        {label}
+      </span>
+      {children}
     </div>
   );
 }
