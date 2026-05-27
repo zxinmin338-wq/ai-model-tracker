@@ -13,11 +13,16 @@ export interface Model {
   brand: string;
   color_hex: string;
   is_active: boolean;
+  current_status?: string;
+  region?: string;
+  discovered_at?: string;
 }
 
 export interface ModelWithUsage extends Model {
   tokens_7d: number;
   requests_7d: number;
+  tokens_prev_7d: number;
+  requests_prev_7d: number;
 }
 
 export interface DailyUsagePoint {
@@ -35,6 +40,7 @@ export interface EventRecord {
   permaslug?: string;
   display_name?: string;
   color_hex?: string;
+  brand?: string;
 }
 
 // ─── Ranking (Homepage) ─────────────────────────────
@@ -54,9 +60,29 @@ export async function getRanking(): Promise<ModelWithUsage[]> {
       ...m,
       tokens_7d: 0,
       requests_7d: 0,
+      tokens_prev_7d: 0,
+      requests_prev_7d: 0,
     }));
   }
   return data ?? [];
+}
+
+// ─── Recent Events (Homepage) ───────────────────────
+
+export async function getRecentEvents(days: number = 7): Promise<EventRecord[]> {
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("events")
+    .select("*, models(permaslug, display_name, brand)")
+    .gte("event_date", since)
+    .order("event_date", { ascending: false });
+
+  return (data ?? []).map((e) => ({
+    ...e,
+    permaslug: (e.models as any)?.permaslug,
+    display_name: (e.models as any)?.display_name,
+    brand: (e.models as any)?.brand,
+  }));
 }
 
 // ─── Daily Usage (Compare page) ─────────────────────
@@ -202,6 +228,7 @@ export async function getActiveModels(): Promise<Model[]> {
 
 export interface TransitionCurve {
   model: {
+    id: number;
     display_name: string;
     brand: string;
     color_hex: string;
@@ -219,6 +246,7 @@ export interface TransitionCurve {
     label: string;
     type: string;
   }>;
+  successor?: string;
 }
 
 export async function getTransitionCurves(): Promise<TransitionCurve[]> {
@@ -244,6 +272,7 @@ export async function getTransitionCurves(): Promise<TransitionCurve[]> {
     const rangeStart = new Date(transDate.getTime() - 7 * 86400000)
       .toISOString()
       .slice(0, 10);
+    // Fixed: extend to D+30 (was D+0 before)
     const rangeEnd = new Date(transDate.getTime() + 30 * 86400000)
       .toISOString()
       .slice(0, 10);
@@ -302,8 +331,22 @@ export async function getTransitionCurves(): Promise<TransitionCurve[]> {
       type: ce.event_type,
     }));
 
+    // Find successor: same-brand new_release within ±7 days
+    const { data: successorEvts } = await supabase
+      .from("events")
+      .select("*, models(display_name, brand)")
+      .eq("event_type", "new_release")
+      .gte("event_date", new Date(transDate.getTime() - 7 * 86400000).toISOString().slice(0, 10))
+      .lte("event_date", new Date(transDate.getTime() + 7 * 86400000).toISOString().slice(0, 10));
+
+    const sameBrandSuccessor = (successorEvts ?? []).find((se) => {
+      const sModel = se.models as any;
+      return sModel?.brand === model.brand && se.model_id !== model.id;
+    });
+
     curves.push({
       model: {
+        id: model.id,
         display_name: model.display_name,
         brand: model.brand,
         color_hex: model.color_hex,
@@ -312,6 +355,9 @@ export async function getTransitionCurves(): Promise<TransitionCurve[]> {
       transition_date: evt.event_date,
       data_points: dataPoints,
       context_events: contextEvents,
+      successor: sameBrandSuccessor
+        ? (sameBrandSuccessor.models as any)?.display_name
+        : undefined,
     });
   }
 
