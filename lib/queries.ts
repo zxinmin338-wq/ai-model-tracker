@@ -156,7 +156,7 @@ export async function getDailyUsage(
   // Get events
   const { data: events } = await supabase
     .from("events")
-    .select("model_id, event_date, label")
+    .select("model_id, event_date, label, event_type")
     .in("model_id", modelIds)
     .gte(
       "event_date",
@@ -168,6 +168,7 @@ export async function getDailyUsage(
     event_date: e.event_date,
     label: e.label,
     color_hex: colorBySlug[slugById[e.model_id]] ?? "#888",
+    event_type: e.event_type as string,
   }));
 
   return { series, events: eventList };
