@@ -45,12 +45,13 @@ function aggregateTo3hBuckets(hourlyDeltas: PeakValleyData[]): Bucket3h[] {
       (d) => d.hour_utc >= startHour && d.hour_utc < endHour && d.avg_delta > 0
     );
     const totalDelta = hoursInBucket.reduce((sum, h) => sum + h.avg_delta, 0);
+    const totalSamples = hoursInBucket.reduce((sum, h) => sum + (h.sample_count ?? 0), 0);
     return {
       label,
       startHour,
       endHour,
       avgDelta: hoursInBucket.length > 0 ? totalDelta / hoursInBucket.length : 0,
-      sampleCount: hoursInBucket.length,
+      sampleCount: totalSamples,
     };
   });
 }
@@ -108,10 +109,13 @@ export function ModelDetailClient({
   // 3-hour buckets
   const buckets = useMemo(() => aggregateTo3hBuckets(hourlyDeltas), [hourlyDeltas]);
   const validBuckets = buckets.filter((b) => b.avgDelta > 0);
-  const peakBucket = validBuckets.length > 0
+  const totalSamples = hourlyDeltas.reduce((sum, h) => sum + (h.sample_count ?? 0), 0);
+  const hasEnoughData = hourlyDeltas.length >= 6 && totalSamples >= 18;
+
+  const peakBucket = validBuckets.length > 0 && hasEnoughData
     ? validBuckets.reduce((a, b) => (b.avgDelta > a.avgDelta ? b : a))
     : null;
-  const valleyBucket = validBuckets.length > 0
+  const valleyBucket = validBuckets.length > 0 && hasEnoughData
     ? validBuckets.reduce((a, b) => (b.avgDelta < a.avgDelta ? b : a))
     : null;
 
@@ -207,7 +211,7 @@ export function ModelDetailClient({
       </div>
 
       {/* 3-Hour Distribution Bar Chart */}
-      {validBuckets.length > 0 ? (
+      {validBuckets.length > 0 && hasEnoughData ? (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
           <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
             Distribution
@@ -247,7 +251,10 @@ export function ModelDetailClient({
                         <div>{t.timezone.centralEurope} {tzStart.central_europe}</div>
                       </div>
                       <div className="mt-1 text-[#1A2332] font-medium">
-                        {formatTokens(bucket.avgDelta)} tokens/hr avg
+                        {formatTokens(bucket.avgDelta)} {t.peakValley.perHour}
+                      </div>
+                      <div className="text-[#94A0AE] text-xs">
+                        {bucket.sampleCount} 个样本
                       </div>
                     </div>
                   );
@@ -289,9 +296,18 @@ export function ModelDetailClient({
         </div>
       ) : (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center">
-          <p className="text-[#6B7785]">
-            {t.detail.peakValleyNoData}
+          <div className="text-sm font-medium text-[#1A2332] mb-2">
+            数据采集中
+          </div>
+          <p className="text-sm text-[#6B7785]">
+            该模型小时级历史数据需要至少 7 天的连续采集才能生成峰谷分析。
           </p>
+          {hourlyDeltas.length > 0 && (
+            <p className="text-xs text-[#94A0AE] mt-2">
+              当前已采集 {hourlyDeltas.length} 个时段，共 {totalSamples} 个样本点
+              （需要至少 6 个时段 × 3 个样本）
+            </p>
+          )}
         </div>
       )}
 
