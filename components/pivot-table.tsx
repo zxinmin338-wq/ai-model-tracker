@@ -36,8 +36,7 @@ export interface PivotTableProps {
 // ─── Helpers ───────────────────────────────────────
 
 function fmtDate(d: string): string {
-  // 'YYYY-MM-DD' → 'MM-DD'
-  return d.slice(5);
+  return d.slice(5); // 'YYYY-MM-DD' → 'MM-DD'
 }
 
 function generateRemark(events: PivotEvent[], dates: string[]): string {
@@ -54,7 +53,7 @@ function generateRemark(events: PivotEvent[], dates: string[]): string {
   return relevant.join(" / ");
 }
 
-type SortKey = "cumulative" | string; // 'cumulative' or a date string
+type SortKey = "cumulative" | string;
 type SortDir = "asc" | "desc";
 
 // ─── Component ─────────────────────────────────────
@@ -68,6 +67,7 @@ export function PivotTable({
 }: PivotTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("cumulative");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [showDaily, setShowDaily] = useState(false);
 
   const fmt = metric === "tokens" ? formatTokens : formatRequests;
 
@@ -106,7 +106,6 @@ export function PivotTable({
       if (sortKey === "cumulative") {
         cmp = (cumulativeMap[a.permaslug] ?? 0) - (cumulativeMap[b.permaslug] ?? 0);
       } else {
-        // Sort by a specific date column
         const va = data[a.permaslug]?.[sortKey] ?? -Infinity;
         const vb = data[b.permaslug]?.[sortKey] ?? -Infinity;
         cmp = (va as number) - (vb as number);
@@ -137,13 +136,18 @@ export function PivotTable({
     );
   }
 
+  const dateRangeLabel =
+    dates.length > 0
+      ? `${fmtDate(dates[0])} ~ ${fmtDate(dates[dates.length - 1])}`
+      : "";
+
   return (
-    <div className="overflow-x-auto border border-[#E8EEF7] rounded-xl">
+    <div className="overflow-x-auto rounded-xl">
       <table className="text-sm w-max min-w-full border-collapse">
-        {/* Sticky header */}
+        {/* Header */}
         <thead className="sticky top-0 z-10 bg-white">
           <tr className="border-b border-[#E8EEF7]">
-            {/* Fixed columns */}
+            {/* Model — sticky */}
             <th className="text-left py-3 px-4 font-medium text-[#6B7785] w-[200px] min-w-[200px] bg-white sticky left-0 z-20 border-r border-[#E8EEF7]">
               {t.table.model}
             </th>
@@ -154,18 +158,7 @@ export function PivotTable({
               {t.table.provider}
             </th>
 
-            {/* Date columns */}
-            {dates.map((d) => (
-              <th
-                key={d}
-                className="text-right py-3 px-3 font-medium text-[#6B7785] w-[80px] min-w-[80px] cursor-pointer select-none hover:text-[#5B8DEF] transition-colors"
-                onClick={() => toggleSort(d)}
-              >
-                {fmtDate(d)}{sortArrow(d)}
-              </th>
-            ))}
-
-            {/* Cumulative */}
+            {/* Cumulative — right after fixed cols */}
             <th
               className="text-right py-3 px-4 font-medium text-[#6B7785] w-[100px] min-w-[100px] cursor-pointer select-none hover:text-[#5B8DEF] transition-colors"
               onClick={() => toggleSort("cumulative")}
@@ -177,6 +170,45 @@ export function PivotTable({
             <th className="text-left py-3 px-4 font-medium text-[#6B7785] w-[200px] min-w-[200px]">
               {t.table.remark}
             </th>
+
+            {/* Daily toggle header */}
+            <th
+              className="text-left py-3 px-4 font-medium text-[#5B8DEF] cursor-pointer select-none whitespace-nowrap"
+              onClick={() => setShowDaily((v) => !v)}
+            >
+              <span className="inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  className={`transition-transform ${showDaily ? "rotate-90" : ""}`}
+                >
+                  <path
+                    d="M5 3L9 7L5 11"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {showDaily
+                  ? `逐日明细 ${dateRangeLabel}`
+                  : `展开逐日明细 (${dates.length}天)`}
+              </span>
+            </th>
+
+            {/* Date columns — only when expanded */}
+            {showDaily &&
+              dates.map((d) => (
+                <th
+                  key={d}
+                  className="text-right py-3 px-3 font-medium text-[#6B7785] w-[80px] min-w-[80px] cursor-pointer select-none hover:text-[#5B8DEF] transition-colors"
+                  onClick={() => toggleSort(d)}
+                >
+                  {fmtDate(d)}{sortArrow(d)}
+                </th>
+              ))}
           </tr>
         </thead>
 
@@ -236,21 +268,6 @@ export function PivotTable({
                   {m.provider || "—"}
                 </td>
 
-                {/* Date cells */}
-                {dates.map((d) => {
-                  const val = rowData[d];
-                  return (
-                    <td
-                      key={d}
-                      className="py-3 px-3 text-right font-mono text-[#1A2332]"
-                    >
-                      {val != null ? fmt(val) : (
-                        <span className="text-[#94A0AE]">—</span>
-                      )}
-                    </td>
-                  );
-                })}
-
                 {/* Cumulative */}
                 <td className="py-3 px-4 text-right font-mono font-semibold text-[#1A2332]">
                   {cumulative > 0 ? fmt(cumulative) : (
@@ -262,11 +279,60 @@ export function PivotTable({
                 <td className="py-3 px-4 text-[#6B7785] text-xs">
                   {remark || "—"}
                 </td>
+
+                {/* Toggle column spacer — shows mini sparkline-style summary when collapsed */}
+                <td className="py-3 px-4 text-[#94A0AE] text-xs whitespace-nowrap">
+                  {!showDaily && dates.length > 0 && (
+                    <MiniSparkText
+                      values={dates.map((d) => rowData[d])}
+                      fmt={fmt}
+                    />
+                  )}
+                </td>
+
+                {/* Date cells — only when expanded */}
+                {showDaily &&
+                  dates.map((d) => {
+                    const val = rowData[d];
+                    return (
+                      <td
+                        key={d}
+                        className="py-3 px-3 text-right font-mono text-[#1A2332]"
+                      >
+                        {val != null ? fmt(val) : (
+                          <span className="text-[#94A0AE]">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ─── Mini spark summary (collapsed state) ──────────
+
+function MiniSparkText({
+  values,
+  fmt,
+}: {
+  values: (number | null | undefined)[];
+  fmt: (n: number) => string;
+}) {
+  const nums = values.filter((v): v is number => v != null && v > 0);
+  if (nums.length === 0) return <span>—</span>;
+
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const latest = nums[nums.length - 1];
+
+  return (
+    <span className="text-[#6B7785]">
+      最低 {fmt(min)} · 最高 {fmt(max)} · 最近 {fmt(latest)}
+    </span>
   );
 }
