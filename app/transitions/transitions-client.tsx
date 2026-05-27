@@ -16,7 +16,7 @@ import type { TransitionCurve } from "@/lib/queries";
 export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
   if (curves.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[300px] text-muted-foreground rounded-lg border bg-card">
+      <div className="flex items-center justify-center h-[300px] text-[#6B7785] bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         No free→paid transition events recorded yet.
       </div>
     );
@@ -48,13 +48,14 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
   return (
     <div className="space-y-6">
       {/* Overlay chart */}
-      <div className="rounded-lg border bg-card p-4">
+      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
         <ResponsiveContainer width="100%" height={450}>
           <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+            <CartesianGrid stroke="#F0F4F8" strokeDasharray="3 3" />
+            <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#6B7785' }} stroke="#E8EEF7" />
             <YAxis
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 12, fill: '#6B7785' }}
+              stroke="#E8EEF7"
               tickFormatter={(v: number) => `${v}%`}
               width={60}
               domain={[0, "auto"]}
@@ -64,19 +65,20 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
                 `${Number(value).toFixed(1)}%`,
                 String(name),
               ]}
+              contentStyle={{ background: '#FFFFFF', border: '1px solid #E8EEF7', borderRadius: 8 }}
             />
             <Legend />
 
             {/* D+0 reference line */}
             <ReferenceLine
               x="D+0"
-              stroke="#ef4444"
+              stroke="#94A0AE"
               strokeDasharray="5 5"
               strokeWidth={2}
               label={{
                 value: "Transition",
                 position: "top",
-                fill: "#ef4444",
+                fill: "#94A0AE",
                 fontSize: 12,
               }}
             />
@@ -84,13 +86,13 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
             {/* 100% reference line */}
             <ReferenceLine
               y={100}
-              stroke="#888"
+              stroke="#94A0AE"
               strokeDasharray="3 3"
               strokeWidth={1}
               label={{
                 value: "100%",
                 position: "right",
-                fill: "#888",
+                fill: "#94A0AE",
                 fontSize: 11,
               }}
             />
@@ -114,7 +116,7 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
 
       {/* Per-model cards */}
       {curves.map((curve) => (
-        <div key={curve.model.permaslug} className="rounded-lg border bg-card p-4">
+        <div key={curve.model.permaslug} className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
           <div className="flex items-center gap-3 mb-3">
             <span
               className="inline-block h-3 w-3 rounded-full shrink-0"
@@ -123,21 +125,21 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
             <h3 className="text-sm font-medium">
               {curve.model.display_name}
             </h3>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-[#6B7785]">
               Transition: {curve.transition_date}
             </span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div>
-              <p className="text-muted-foreground text-xs">D-1 (baseline)</p>
+              <p className="text-[#6B7785] text-xs">D-1 (baseline)</p>
               <p className="font-mono font-medium">100%</p>
             </div>
             {[0, 1, 7].map((offset) => {
               const pt = curve.data_points.find((p) => p.day_offset === offset);
               return (
                 <div key={offset}>
-                  <p className="text-muted-foreground text-xs">
+                  <p className="text-[#6B7785] text-xs">
                     D+{offset}
                   </p>
                   <p className="font-mono font-medium">
@@ -150,11 +152,11 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
 
           {curve.context_events.length > 0 && (
             <div className="mt-3 pt-3 border-t">
-              <p className="text-xs text-muted-foreground mb-1">Related events:</p>
+              <p className="text-xs text-[#6B7785] mb-1">Related events:</p>
               {curve.context_events.map((ce, i) => (
                 <p key={i} className="text-xs">
                   D{ce.days_offset >= 0 ? "+" : ""}{ce.days_offset}: {ce.label}{" "}
-                  <span className="text-muted-foreground">({ce.type.replace(/_/g, " ")})</span>
+                  <span className="text-[#6B7785]">({ce.type.replace(/_/g, " ")})</span>
                 </p>
               ))}
             </div>

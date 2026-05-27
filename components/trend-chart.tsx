@@ -43,7 +43,7 @@ export function TrendChart({
   if (data.length === 0) {
     return (
       <div
-        className="flex items-center justify-center text-muted-foreground"
+        className="flex items-center justify-center text-[#6B7785]"
         style={{ height }}
       >
         No data available
@@ -54,14 +54,16 @@ export function TrendChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+        <CartesianGrid stroke="#F0F4F8" strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 12, fill: '#6B7785' }}
+          stroke="#E8EEF7"
           tickFormatter={(v: string) => v.slice(5)} // MM-DD
         />
         <YAxis
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 12, fill: '#6B7785' }}
+          stroke="#E8EEF7"
           tickFormatter={(v: number) => yFormatter(v)}
           width={70}
         />
@@ -71,6 +73,7 @@ export function TrendChart({
             String(name),
           ]}
           labelFormatter={(label: unknown) => `Date: ${String(label)}`}
+          contentStyle={{ background: '#FFFFFF', border: '1px solid #E8EEF7', borderRadius: 8 }}
         />
         <Legend />
 

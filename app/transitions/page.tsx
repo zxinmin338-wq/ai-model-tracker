@@ -7,13 +7,16 @@ export default async function TransitionsPage() {
   const curves = await getTransitionCurves();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-12 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Free → Paid Decay Curves
+        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+          Transitions
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332] mt-1">
+          转付费分析
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Normalized to D-1 = 100%, aligned to transition date D+0
+        <p className="text-base text-[#6B7785] mt-1">
+          归一化到 D-1 = 100%,按转付费日期 D+0 对齐
         </p>
       </div>
       <TransitionsClient curves={curves} />

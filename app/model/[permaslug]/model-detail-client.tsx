@@ -88,9 +88,9 @@ export function ModelDetailClient({
       </div>
 
       {/* Trend Chart */}
-      <div className="rounded-lg border bg-card p-4">
+      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
         {loading ? (
-          <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
             Loading...
           </div>
         ) : (
@@ -106,21 +106,21 @@ export function ModelDetailClient({
       {/* Peak / Valley Card */}
       {peak && valley && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-lg border bg-card p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+          <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+            <h3 className="text-sm font-medium text-[#6B7785] mb-2">
               Peak Hour (highest avg delta)
             </h3>
             <p className="text-lg font-bold">{formatTimezoneLabel(peak.hour_utc)}</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-[#6B7785] mt-1">
               Avg delta: {formatTokens(peak.avg_delta)} tokens/hr
             </p>
           </div>
-          <div className="rounded-lg border bg-card p-4">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2">
+          <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+            <h3 className="text-sm font-medium text-[#6B7785] mb-2">
               Valley Hour (lowest avg delta)
             </h3>
             <p className="text-lg font-bold">{formatTimezoneLabel(valley.hour_utc)}</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-[#6B7785] mt-1">
               Avg delta: {formatTokens(valley.avg_delta)} tokens/hr
             </p>
           </div>
@@ -129,8 +129,8 @@ export function ModelDetailClient({
 
       {/* Event Timeline */}
       {events.length > 0 && (
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+          <h3 className="text-sm font-medium text-[#6B7785] mb-3">
             Event Timeline
           </h3>
           <div className="space-y-3">
@@ -140,13 +140,13 @@ export function ModelDetailClient({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{evt.label}</span>
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-[#E8EEF7] text-[#6B7785]">
                       {evt.event_type.replace(/_/g, " ")}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{evt.event_date}</p>
+                  <p className="text-xs text-[#6B7785]">{evt.event_date}</p>
                   {evt.description && (
-                    <p className="text-sm text-muted-foreground mt-0.5">{evt.description}</p>
+                    <p className="text-sm text-[#6B7785] mt-0.5">{evt.description}</p>
                   )}
                 </div>
               </div>

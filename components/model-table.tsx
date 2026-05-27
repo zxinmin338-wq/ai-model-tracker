@@ -26,8 +26,8 @@ export function ModelTable({ models }: { models: ModelWithUsage[] }) {
       </TableHeader>
       <TableBody>
         {models.map((model, i) => (
-          <TableRow key={model.id} className="cursor-pointer hover:bg-muted/50">
-            <TableCell className="font-medium text-muted-foreground">
+          <TableRow key={model.id} className="cursor-pointer hover:bg-[#F0F4F8]">
+            <TableCell className="font-medium text-[#6B7785]">
               {i + 1}
             </TableCell>
             <TableCell>
@@ -42,7 +42,7 @@ export function ModelTable({ models }: { models: ModelWithUsage[] }) {
                 {model.display_name}
               </Link>
             </TableCell>
-            <TableCell className="text-muted-foreground">
+            <TableCell className="text-[#6B7785]">
               {model.brand}
             </TableCell>
             <TableCell className="text-right font-mono">
@@ -55,7 +55,7 @@ export function ModelTable({ models }: { models: ModelWithUsage[] }) {
         ))}
         {models.length === 0 && (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={5} className="text-center text-[#6B7785] py-8">
               No data yet. Trigger a fetch first.
             </TableCell>
           </TableRow>

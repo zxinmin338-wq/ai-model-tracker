@@ -134,9 +134,9 @@ export function CompareClient({ models }: { models: Model[] }) {
       </div>
 
       {/* Chart */}
-      <div className="rounded-lg border bg-card p-4">
+      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
         {loading ? (
-          <div className="flex items-center justify-center h-[400px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
             Loading...
           </div>
         ) : (
@@ -151,8 +151,8 @@ export function CompareClient({ models }: { models: Model[] }) {
 
       {/* Legend table */}
       {selectedModels.length > 0 && series.length > 0 && (
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="text-sm font-medium mb-3 text-muted-foreground">
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+          <h3 className="text-sm font-medium mb-3 text-[#6B7785]">
             Totals in selected range ({days}d)
           </h3>
           <div className="space-y-2">
