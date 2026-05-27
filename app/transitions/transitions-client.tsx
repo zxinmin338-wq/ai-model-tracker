@@ -23,7 +23,13 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
   }
 
   // Build unified dataset: day_offset as X, one column per model
+  // Ensure full D-7 to D+30 range even when data is sparse
   const offsetMap = new Map<number, Record<string, number | string>>();
+
+  // Pre-fill all offsets from -7 to +30
+  for (let offset = -7; offset <= 30; offset++) {
+    offsetMap.set(offset, { day: `D${offset >= 0 ? "+" : ""}${offset}` });
+  }
 
   for (const curve of curves) {
     for (const pt of curve.data_points) {

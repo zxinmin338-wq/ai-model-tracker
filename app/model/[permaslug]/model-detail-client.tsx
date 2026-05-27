@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendChart } from "@/components/trend-chart";
 import { formatTokens, formatRequests } from "@/lib/format";
@@ -10,6 +21,38 @@ import type { Model, EventRecord, PeakValleyData, DailyUsagePoint } from "@/lib/
 
 type Metric = "tokens" | "requests";
 type TimeRange = 7 | 14 | 30;
+
+// 3-hour bucket labels
+const BUCKET_LABELS = [
+  "00-03", "03-06", "06-09", "09-12",
+  "12-15", "15-18", "18-21", "21-24",
+];
+
+interface Bucket3h {
+  label: string;
+  startHour: number;
+  endHour: number;
+  avgDelta: number;
+  sampleCount: number;
+}
+
+function aggregateTo3hBuckets(hourlyDeltas: PeakValleyData[]): Bucket3h[] {
+  return BUCKET_LABELS.map((label, i) => {
+    const startHour = i * 3;
+    const endHour = startHour + 3;
+    const hoursInBucket = hourlyDeltas.filter(
+      (d) => d.hour_utc >= startHour && d.hour_utc < endHour && d.avg_delta > 0
+    );
+    const totalDelta = hoursInBucket.reduce((sum, h) => sum + h.avg_delta, 0);
+    return {
+      label,
+      startHour,
+      endHour,
+      avgDelta: hoursInBucket.length > 0 ? totalDelta / hoursInBucket.length : 0,
+      sampleCount: hoursInBucket.length,
+    };
+  });
+}
 
 export function ModelDetailClient({
   model,
@@ -61,13 +104,14 @@ export function ModelDetailClient({
       color: e.color_hex ?? model.color_hex,
     }));
 
-  // Peak / Valley from hourlyDeltas (filter out zero/negative)
-  const validDeltas = hourlyDeltas.filter((d) => d.avg_delta > 0);
-  const peak = validDeltas.length > 0
-    ? validDeltas.reduce((a, b) => (b.avg_delta > a.avg_delta ? b : a))
+  // 3-hour buckets
+  const buckets = useMemo(() => aggregateTo3hBuckets(hourlyDeltas), [hourlyDeltas]);
+  const validBuckets = buckets.filter((b) => b.avgDelta > 0);
+  const peakBucket = validBuckets.length > 0
+    ? validBuckets.reduce((a, b) => (b.avgDelta > a.avgDelta ? b : a))
     : null;
-  const valley = validDeltas.length > 0
-    ? validDeltas.reduce((a, b) => (b.avg_delta < a.avg_delta ? b : a))
+  const valleyBucket = validBuckets.length > 0
+    ? validBuckets.reduce((a, b) => (b.avgDelta < a.avgDelta ? b : a))
     : null;
 
   // Status badge
@@ -161,25 +205,108 @@ export function ModelDetailClient({
         )}
       </div>
 
-      {/* Multi-timezone Peak / Valley Cards */}
-      {peak && valley ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <PeakValleyCard
-            title="Peak Hours (UTC, last 7d avg)"
-            hourUtc={peak.hour_utc}
-            avgDelta={peak.avg_delta}
-          />
-          <PeakValleyCard
-            title="Valley Hours (UTC, last 7d avg)"
-            hourUtc={valley.hour_utc}
-            avgDelta={valley.avg_delta}
-          />
+      {/* 3-Hour Distribution Bar Chart */}
+      {validBuckets.length > 0 ? (
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+          <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+            Distribution
+          </div>
+          <h3 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
+            24 小时调用分布
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={buckets} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+              <CartesianGrid stroke="#F0F4F8" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 12, fill: '#6B7785' }}
+                stroke="#E8EEF7"
+                label={{ value: 'UTC', position: 'insideBottomRight', offset: -5, fontSize: 11, fill: '#94A0AE' }}
+              />
+              <YAxis
+                tick={{ fontSize: 12, fill: '#6B7785' }}
+                stroke="#E8EEF7"
+                tickFormatter={(v: number) => formatTokens(v)}
+                width={70}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.[0]) return null;
+                  const bucket = payload[0].payload as Bucket3h;
+                  const tzStart = utcHourToTimezones(bucket.startHour);
+                  return (
+                    <div className="bg-white border border-[#E8EEF7] rounded-lg p-3 shadow-sm text-sm">
+                      <div className="font-medium text-[#1A2332] mb-1">
+                        UTC {bucket.label}
+                      </div>
+                      <div className="text-[#6B7785] space-y-0.5">
+                        <div>Beijing {tzStart.beijing}</div>
+                        <div>US East {tzStart.us_east}</div>
+                        <div>US West {tzStart.us_west}</div>
+                        <div>Central Europe {tzStart.central_europe}</div>
+                      </div>
+                      <div className="mt-1 text-[#1A2332] font-medium">
+                        {formatTokens(bucket.avgDelta)} tokens/hr avg
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+              <Bar dataKey="avgDelta" radius={[4, 4, 0, 0]}>
+                {buckets.map((bucket, i) => {
+                  const isPeak = peakBucket && bucket.label === peakBucket.label;
+                  const isValley = valleyBucket && bucket.label === valleyBucket.label;
+                  return (
+                    <Cell
+                      key={i}
+                      fill={isPeak ? model.color_hex : isValley ? '#94A0AE' : `${model.color_hex}66`}
+                      stroke={isPeak || isValley ? model.color_hex : 'none'}
+                      strokeWidth={isPeak || isValley ? 2 : 0}
+                    />
+                  );
+                })}
+              </Bar>
+              {peakBucket && (
+                <ReferenceLine
+                  x={peakBucket.label}
+                  stroke="none"
+                  label={{ value: '峰', position: 'top', fill: model.color_hex, fontSize: 13, fontWeight: 600 }}
+                />
+              )}
+              {valleyBucket && (
+                <ReferenceLine
+                  x={valleyBucket.label}
+                  stroke="none"
+                  label={{ value: '谷', position: 'top', fill: '#94A0AE', fontSize: 13, fontWeight: 600 }}
+                />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="text-xs text-[#94A0AE] mt-3">
+            数据按 OpenRouter 3 小时刷新粒度展示
+          </p>
         </div>
       ) : (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center">
           <p className="text-[#6B7785]">
             Peak/Valley analysis requires more hourly data. Keep data collection running.
           </p>
+        </div>
+      )}
+
+      {/* Multi-timezone Peak / Valley Cards (3-hour windows) */}
+      {peakBucket && valleyBucket && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <PeakValley3hCard
+            title="峰值时段 (7日平均最高)"
+            bucket={peakBucket}
+            colorHex={model.color_hex}
+          />
+          <PeakValley3hCard
+            title="谷值时段 (7日平均最低)"
+            bucket={valleyBucket}
+            colorHex={model.color_hex}
+          />
         </div>
       )}
 
@@ -224,20 +351,19 @@ export function ModelDetailClient({
   );
 }
 
-// ─── Peak/Valley Sub-component ──────────────────────
+// ─── Peak/Valley 3h Sub-component ───────────────────
 
-function PeakValleyCard({
+function PeakValley3hCard({
   title,
-  hourUtc,
-  avgDelta,
+  bucket,
+  colorHex,
 }: {
   title: string;
-  hourUtc: number;
-  avgDelta: number;
+  bucket: Bucket3h;
+  colorHex: string;
 }) {
-  const nextHour = (hourUtc + 1) % 24;
-  const tz = utcHourToTimezones(hourUtc);
-
+  const tzStart = utcHourToTimezones(bucket.startHour);
+  const tzEnd = utcHourToTimezones(bucket.endHour % 24);
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
@@ -247,28 +373,28 @@ function PeakValleyCard({
       </div>
 
       <div className="text-2xl font-semibold text-[#1A2332] mb-1">
-        {pad(hourUtc)}:00 – {pad(nextHour)}:00 UTC
+        UTC {pad(bucket.startHour)}:00 – {pad(bucket.endHour % 24)}:00
       </div>
-      <div className="text-base text-[#5B8DEF] font-medium mb-4">
-        +{formatTokens(avgDelta)} tokens/hour
+      <div className="text-base font-medium mb-4" style={{ color: colorHex }}>
+        +{formatTokens(bucket.avgDelta)} tokens/hr avg
       </div>
 
       <div className="space-y-1.5 text-sm text-[#6B7785]">
         <div className="flex justify-between">
           <span>Beijing</span>
-          <span className="font-medium text-[#1A2332]">{tz.beijing}</span>
+          <span className="font-medium text-[#1A2332]">{tzStart.beijing} – {tzEnd.beijing}</span>
         </div>
         <div className="flex justify-between">
           <span>US East</span>
-          <span className="font-medium text-[#1A2332]">{tz.us_east}</span>
+          <span className="font-medium text-[#1A2332]">{tzStart.us_east} – {tzEnd.us_east}</span>
         </div>
         <div className="flex justify-between">
           <span>US West</span>
-          <span className="font-medium text-[#1A2332]">{tz.us_west}</span>
+          <span className="font-medium text-[#1A2332]">{tzStart.us_west} – {tzEnd.us_west}</span>
         </div>
         <div className="flex justify-between">
           <span>Central Europe</span>
-          <span className="font-medium text-[#1A2332]">{tz.central_europe}</span>
+          <span className="font-medium text-[#1A2332]">{tzStart.central_europe} – {tzEnd.central_europe}</span>
         </div>
       </div>
     </div>

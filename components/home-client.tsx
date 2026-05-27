@@ -267,14 +267,14 @@ export function HomeClient({
       </div>
 
       {/* This Week's Events */}
-      {recentEvents.length > 0 && (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 mb-6">
-          <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
-            Events
-          </div>
-          <h2 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-            本周事件
-          </h2>
+      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 mb-6">
+        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+          Events
+        </div>
+        <h2 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
+          本周事件
+        </h2>
+        {recentEvents.length > 0 ? (
           <div className="space-y-3">
             {recentEvents.map((evt) => (
               <div key={evt.id} className="flex items-start gap-3">
@@ -295,8 +295,10 @@ export function HomeClient({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-sm text-[#94A0AE]">本周暂无事件记录</p>
+        )}
+      </div>
     </div>
   );
 }
