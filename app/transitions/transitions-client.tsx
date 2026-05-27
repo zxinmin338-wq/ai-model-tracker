@@ -11,13 +11,14 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
+import { t } from "@/lib/i18n";
 import type { TransitionCurve } from "@/lib/queries";
 
 export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
   if (curves.length === 0) {
     return (
       <div className="flex items-center justify-center h-[300px] text-[#6B7785] bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        No free→paid transition events recorded yet.
+        {t.transitions.noData}
       </div>
     );
   }
@@ -99,7 +100,7 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
               strokeDasharray="5 5"
               strokeWidth={2}
               label={{
-                value: "Transition",
+                value: t.transitions.transition,
                 position: "top",
                 fill: "#94A0AE",
                 fontSize: 12,
@@ -113,7 +114,7 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
               strokeDasharray="3 3"
               strokeWidth={1}
               label={{
-                value: "100%",
+                value: t.transitions.baseline,
                 position: "right",
                 fill: "#94A0AE",
                 fontSize: 11,
@@ -143,17 +144,17 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
           History
         </div>
         <h3 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-          历史转付费案例
+          {t.transitions.historyCases}
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#E8EEF7]">
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">Model</th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">Date</th>
+                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">{t.table.model}</th>
+                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">{t.table.date}</th>
                 <th className="text-right py-3 px-2 font-medium text-[#6B7785]">D+7</th>
                 <th className="text-right py-3 px-2 font-medium text-[#6B7785]">D+30</th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">Successor</th>
+                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">{t.table.successor}</th>
               </tr>
             </thead>
             <tbody>
@@ -199,7 +200,7 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
               {curve.model.display_name}
             </h3>
             <span className="text-xs text-[#6B7785]">
-              Transition: {curve.transition_date}
+              {t.transitions.transition}: {curve.transition_date}
             </span>
           </div>
 
@@ -223,7 +224,7 @@ export function TransitionsClient({ curves }: { curves: TransitionCurve[] }) {
 
           {curve.context_events.length > 0 && (
             <div className="mt-4 pt-4 border-t border-[#E8EEF7]">
-              <p className="text-xs text-[#6B7785] mb-1">Related events:</p>
+              <p className="text-xs text-[#6B7785] mb-1">{t.transitions.relatedEvents}:</p>
               {curve.context_events.map((ce, i) => (
                 <p key={i} className="text-xs text-[#1A2332]">
                   D{ce.days_offset >= 0 ? "+" : ""}{ce.days_offset}: {ce.label}{" "}

@@ -1,5 +1,6 @@
 import { getActiveModels } from "@/lib/queries";
 import { CompareClient } from "./compare-client";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,10 @@ export default async function ComparePage() {
           Trends
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332] mt-1">
-          趋势对比
+          {t.nav.compare}
         </h1>
         <p className="text-base text-[#6B7785] mt-1">
-          选择 2-5 个模型叠加对比
+          {t.compare.subtitle}
         </p>
       </div>
       <CompareClient models={models} />

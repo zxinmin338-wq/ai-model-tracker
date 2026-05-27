@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 import type { Model } from "@/lib/queries";
 
 export function SettingsClient({ models: initialModels }: { models: Model[] }) {
@@ -56,12 +57,12 @@ export function SettingsClient({ models: initialModels }: { models: Model[] }) {
           My Models
         </div>
         <h2 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-          我方模型
+          {t.settings.myModels}
         </h2>
 
         {ownModels.length === 0 ? (
           <p className="text-sm text-[#94A0AE]">
-            尚未标记我方模型。在下方列表中勾选即可。
+            {t.settings.noOwnModels}
           </p>
         ) : (
           <div className="space-y-3">
@@ -84,7 +85,7 @@ export function SettingsClient({ models: initialModels }: { models: Model[] }) {
           All Models
         </div>
         <h2 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-          全部模型
+          {t.settings.allModels}
         </h2>
 
         <div className="space-y-3">
@@ -191,7 +192,7 @@ function ModelRow({
               }}
               className="text-xs text-[#5B8DEF] hover:text-[#4A7DDF]"
             >
-              保存
+              {t.settings.save}
             </button>
           </div>
         ) : (
@@ -199,7 +200,7 @@ function ModelRow({
             onClick={() => setEditingProvider(true)}
             className="text-sm text-[#94A0AE] hover:text-[#5B8DEF] transition-colors"
           >
-            {model.provider || "设置 Provider"}
+            {model.provider || t.settings.setProvider}
           </button>
         )}
       </div>

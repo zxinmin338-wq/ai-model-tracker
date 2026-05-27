@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendChart } from "@/components/trend-chart";
 import { formatTokens, formatRequests } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import { utcHourToTimezones } from "@/lib/timezones";
 import type { Model, EventRecord, PeakValleyData, DailyUsagePoint } from "@/lib/queries";
 
@@ -132,7 +133,7 @@ export function ModelDetailClient({
         href="/"
         className="inline-flex items-center gap-1 text-sm text-[#6B7785] hover:text-[#5B8DEF] transition-colors"
       >
-        ← Back to Rankings
+        {t.detail.backToRankings}
       </Link>
 
       {/* Header */}
@@ -156,7 +157,7 @@ export function ModelDetailClient({
           )}
           {isNew && (
             <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[#E8EEF7] text-[#5B8DEF]">
-              NEW
+              {t.common.new}
             </span>
           )}
         </div>
@@ -165,9 +166,9 @@ export function ModelDetailClient({
         </p>
         {(model.discovered_at || model.region) && (
           <p className="text-sm text-[#94A0AE] mt-1">
-            {model.discovered_at && `Discovered: ${model.discovered_at.slice(0, 10)}`}
+            {model.discovered_at && `${t.detail.discovered}: ${model.discovered_at.slice(0, 10)}`}
             {model.discovered_at && model.region && " · "}
-            {model.region && `Region: ${model.region.charAt(0).toUpperCase() + model.region.slice(1)}`}
+            {model.region && `${t.detail.region}: ${model.region.charAt(0).toUpperCase() + model.region.slice(1)}`}
           </p>
         )}
       </div>
@@ -176,15 +177,15 @@ export function ModelDetailClient({
       <div className="flex items-center gap-4">
         <Tabs value={metric} onValueChange={(v) => setMetric(v as Metric)}>
           <TabsList>
-            <TabsTrigger value="tokens">Tokens</TabsTrigger>
-            <TabsTrigger value="requests">Requests</TabsTrigger>
+            <TabsTrigger value="tokens">{t.metric.tokens}</TabsTrigger>
+            <TabsTrigger value="requests">{t.metric.requests}</TabsTrigger>
           </TabsList>
         </Tabs>
         <Tabs value={String(days)} onValueChange={(v) => setDays(Number(v) as TimeRange)}>
           <TabsList>
-            <TabsTrigger value="7">7d</TabsTrigger>
-            <TabsTrigger value="14">14d</TabsTrigger>
-            <TabsTrigger value="30">30d</TabsTrigger>
+            <TabsTrigger value="7">{t.range.days7}</TabsTrigger>
+            <TabsTrigger value="14">{t.range.days14}</TabsTrigger>
+            <TabsTrigger value="30">{t.range.days30}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -193,7 +194,7 @@ export function ModelDetailClient({
       <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
         {loading ? (
           <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
-            Loading...
+            {t.common.loading}
           </div>
         ) : (
           <TrendChart
@@ -212,7 +213,7 @@ export function ModelDetailClient({
             Distribution
           </div>
           <h3 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-            24 小时调用分布
+            {t.detail.distribution}
           </h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={buckets} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
@@ -240,10 +241,10 @@ export function ModelDetailClient({
                         UTC {bucket.label}
                       </div>
                       <div className="text-[#6B7785] space-y-0.5">
-                        <div>Beijing {tzStart.beijing}</div>
-                        <div>US East {tzStart.us_east}</div>
-                        <div>US West {tzStart.us_west}</div>
-                        <div>Central Europe {tzStart.central_europe}</div>
+                        <div>{t.timezone.beijing} {tzStart.beijing}</div>
+                        <div>{t.timezone.usEast} {tzStart.us_east}</div>
+                        <div>{t.timezone.usWest} {tzStart.us_west}</div>
+                        <div>{t.timezone.centralEurope} {tzStart.central_europe}</div>
                       </div>
                       <div className="mt-1 text-[#1A2332] font-medium">
                         {formatTokens(bucket.avgDelta)} tokens/hr avg
@@ -283,13 +284,13 @@ export function ModelDetailClient({
             </BarChart>
           </ResponsiveContainer>
           <p className="text-xs text-[#94A0AE] mt-3">
-            数据按 OpenRouter 3 小时刷新粒度展示
+            {t.peakValley.dataNote}
           </p>
         </div>
       ) : (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center">
           <p className="text-[#6B7785]">
-            Peak/Valley analysis requires more hourly data. Keep data collection running.
+            {t.detail.peakValleyNoData}
           </p>
         </div>
       )}
@@ -298,12 +299,12 @@ export function ModelDetailClient({
       {peakBucket && valleyBucket && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <PeakValley3hCard
-            title="峰值时段 (7日平均最高)"
+            title={`${t.peakValley.peak} ${t.peakValley.peakSuffix}`}
             bucket={peakBucket}
             colorHex={model.color_hex}
           />
           <PeakValley3hCard
-            title="谷值时段 (7日平均最低)"
+            title={`${t.peakValley.valley} ${t.peakValley.valleySuffix}`}
             bucket={valleyBucket}
             colorHex={model.color_hex}
           />
@@ -317,7 +318,7 @@ export function ModelDetailClient({
             Timeline
           </div>
           <h3 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-            Event Timeline
+            {t.detail.eventTimeline}
           </h3>
           <div className="space-y-4">
             {events.map((evt) => (
@@ -381,19 +382,19 @@ function PeakValley3hCard({
 
       <div className="space-y-1.5 text-sm text-[#6B7785]">
         <div className="flex justify-between">
-          <span>Beijing</span>
+          <span>{t.timezone.beijing}</span>
           <span className="font-medium text-[#1A2332]">{tzStart.beijing} – {tzEnd.beijing}</span>
         </div>
         <div className="flex justify-between">
-          <span>US East</span>
+          <span>{t.timezone.usEast}</span>
           <span className="font-medium text-[#1A2332]">{tzStart.us_east} – {tzEnd.us_east}</span>
         </div>
         <div className="flex justify-between">
-          <span>US West</span>
+          <span>{t.timezone.usWest}</span>
           <span className="font-medium text-[#1A2332]">{tzStart.us_west} – {tzEnd.us_west}</span>
         </div>
         <div className="flex justify-between">
-          <span>Central Europe</span>
+          <span>{t.timezone.centralEurope}</span>
           <span className="font-medium text-[#1A2332]">{tzStart.central_europe} – {tzEnd.central_europe}</span>
         </div>
       </div>

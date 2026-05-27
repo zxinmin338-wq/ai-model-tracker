@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { formatTokens, formatRequests } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import type { ModelWithUsage, EventRecord } from "@/lib/queries";
 
 type SortKey = "tokens_7d" | "growth";
@@ -85,10 +86,10 @@ export function HomeClient({
     deprecated: "bg-[#FDECEA] text-[#E85B81]",
   };
   const statusLabels: Record<string, string> = {
-    free: "FREE",
-    paid: "PAID",
-    transitioning: "TRANSITIONING",
-    deprecated: "DEPRECATED",
+    free: t.status.free,
+    paid: t.status.paid,
+    transitioning: t.status.transitioning,
+    deprecated: t.status.deprecated,
   };
 
   return (
@@ -96,19 +97,19 @@ export function HomeClient({
       {/* Page header */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332]">
-          AI Model Tracker
+          {t.home.title}
         </h1>
         <p className="text-base text-[#6B7785] mt-1">
-          Free model lifecycle monitoring
+          {t.home.subtitle}
         </p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-        <KPICard label="TRACKED MODELS" value={String(trackedCount)} />
-        <KPICard label="NEW FREE THIS WEEK" value={String(newThisWeek)} />
-        <KPICard label="FREE→PAID THIS WEEK" value={String(freeToPaidThisWeek)} />
-        <KPICard label="TOTAL 7D TOKENS" value={formatTokens(totalTokens7d)} />
+        <KPICard label={t.kpi.trackedModels} value={String(trackedCount)} />
+        <KPICard label={t.kpi.newFreeThisWeek} value={String(newThisWeek)} />
+        <KPICard label={t.kpi.freeToPaidThisWeek} value={String(freeToPaidThisWeek)} />
+        <KPICard label={t.kpi.total7dTokens} value={formatTokens(totalTokens7d)} />
       </div>
 
       {/* Model Rankings */}
@@ -117,37 +118,37 @@ export function HomeClient({
           Rankings
         </div>
         <h2 className="text-xl font-semibold text-[#1A2332] mt-1">
-          模型排行榜
+          {t.home.rankings}
         </h2>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 mt-6 mb-4">
           <FilterSelect
-            label="Brand"
+            label={t.filter.brand}
             value={brandFilter}
             onChange={setBrandFilter}
-            options={[{ value: "all", label: "All" }, ...brands.map((b) => ({ value: b, label: b }))]}
+            options={[{ value: "all", label: t.common.all }, ...brands.map((b) => ({ value: b, label: b }))]}
           />
           <FilterSelect
-            label="Status"
+            label={t.filter.status}
             value={statusFilter}
             onChange={setStatusFilter}
             options={[
-              { value: "all", label: "All" },
-              { value: "free", label: "Free" },
-              { value: "paid", label: "Paid" },
-              { value: "transitioning", label: "Transitioning" },
+              { value: "all", label: t.common.all },
+              { value: "free", label: t.status.free },
+              { value: "paid", label: t.status.paid },
+              { value: "transitioning", label: t.status.transitioning },
             ]}
           />
           <FilterSelect
-            label="Region"
+            label={t.filter.region}
             value={regionFilter}
             onChange={setRegionFilter}
             options={[
-              { value: "all", label: "All" },
-              { value: "china", label: "China" },
-              { value: "us", label: "US" },
-              { value: "europe", label: "Europe" },
+              { value: "all", label: t.common.all },
+              { value: "china", label: t.filter.china },
+              { value: "us", label: t.filter.us },
+              { value: "europe", label: t.filter.europe },
             ]}
           />
         </div>
@@ -161,28 +162,28 @@ export function HomeClient({
                   #
                 </th>
                 <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
-                  Model
+                  {t.table.model}
                 </th>
                 <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
-                  Brand
+                  {t.table.brand}
                 </th>
                 <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
-                  Status
+                  {t.table.status}
                 </th>
                 <th
                   className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
                   onClick={() => toggleSort("tokens_7d")}
                 >
-                  7d Tokens{sortArrow("tokens_7d")}
+                  {t.table.tokens7d}{sortArrow("tokens_7d")}
                 </th>
                 <th className="text-right py-3 px-2 font-medium text-[#6B7785]">
-                  7d Requests
+                  {t.table.requests7d}
                 </th>
                 <th
                   className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
                   onClick={() => toggleSort("growth")}
                 >
-                  7d Growth{sortArrow("growth")}
+                  {t.table.growth7d}{sortArrow("growth")}
                 </th>
               </tr>
             </thead>
@@ -213,7 +214,7 @@ export function HomeClient({
                         {m.display_name}
                         {isNew && (
                           <span className="text-xs font-medium px-1.5 py-0.5 rounded-md bg-[#E8EEF7] text-[#5B8DEF]">
-                            NEW
+                            {t.common.new}
                           </span>
                         )}
                       </Link>
@@ -225,7 +226,7 @@ export function HomeClient({
                           statusColors[m.current_status ?? "free"] ?? statusColors.free
                         }`}
                       >
-                        {statusLabels[m.current_status ?? "free"] ?? "FREE"}
+                        {statusLabels[m.current_status ?? "free"] ?? t.status.free}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right font-mono text-[#1A2332]">
@@ -257,7 +258,7 @@ export function HomeClient({
                     colSpan={7}
                     className="text-center text-[#6B7785] py-8"
                   >
-                    No data yet. Trigger a fetch first.
+                    {t.common.noData}
                   </td>
                 </tr>
               )}
@@ -272,7 +273,7 @@ export function HomeClient({
           Events
         </div>
         <h2 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-          本周事件
+          {t.home.thisWeekEvents}
         </h2>
         {recentEvents.length > 0 ? (
           <div className="space-y-3">
@@ -296,7 +297,7 @@ export function HomeClient({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[#94A0AE]">本周暂无事件记录</p>
+          <p className="text-sm text-[#94A0AE]">{t.home.noEvents}</p>
         )}
       </div>
     </div>

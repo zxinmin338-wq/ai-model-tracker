@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendChart } from "@/components/trend-chart";
 import { formatTokens, formatRequests } from "@/lib/format";
+import { t } from "@/lib/i18n";
 import type { Model, DailyUsagePoint } from "@/lib/queries";
 
 type Metric = "tokens" | "requests";
@@ -116,8 +117,8 @@ export function CompareClient({ models }: { models: Model[] }) {
           onValueChange={(v) => setMetric(v as Metric)}
         >
           <TabsList>
-            <TabsTrigger value="tokens">Tokens</TabsTrigger>
-            <TabsTrigger value="requests">Requests</TabsTrigger>
+            <TabsTrigger value="tokens">{t.metric.tokens}</TabsTrigger>
+            <TabsTrigger value="requests">{t.metric.requests}</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -126,9 +127,9 @@ export function CompareClient({ models }: { models: Model[] }) {
           onValueChange={(v) => setDays(Number(v) as TimeRange)}
         >
           <TabsList>
-            <TabsTrigger value="7">7d</TabsTrigger>
-            <TabsTrigger value="14">14d</TabsTrigger>
-            <TabsTrigger value="30">30d</TabsTrigger>
+            <TabsTrigger value="7">{t.range.days7}</TabsTrigger>
+            <TabsTrigger value="14">{t.range.days14}</TabsTrigger>
+            <TabsTrigger value="30">{t.range.days30}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -137,7 +138,7 @@ export function CompareClient({ models }: { models: Model[] }) {
       <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
         {loading ? (
           <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
-            Loading...
+            {t.common.loading}
           </div>
         ) : (
           <TrendChart
@@ -153,7 +154,7 @@ export function CompareClient({ models }: { models: Model[] }) {
       {selectedModels.length > 0 && series.length > 0 && (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
           <h3 className="text-sm font-medium mb-3 text-[#6B7785]">
-            Totals in selected range ({days}d)
+            {t.compare.totalInRange}（{days}天）
           </h3>
           <div className="space-y-2">
             {selectedModels.map((m) => {

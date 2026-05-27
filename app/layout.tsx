@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { NavLink } from "@/components/nav-link";
+import { t } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "AI Model Tracker",
@@ -43,12 +44,12 @@ export default function RootLayout({
               AI Model Tracker
             </Link>
             <nav className="flex items-center gap-6 text-sm font-medium">
-              <NavLink href="/">首页</NavLink>
-              <NavLink href="/compare">趋势对比</NavLink>
-              <NavLink href="/transitions">转付费分析</NavLink>
-              <NavLink href="/events">事件管理</NavLink>
+              <NavLink href="/">{t.nav.home}</NavLink>
+              <NavLink href="/compare">{t.nav.compare}</NavLink>
+              <NavLink href="/transitions">{t.nav.transitions}</NavLink>
+              <NavLink href="/events">{t.nav.events}</NavLink>
               <span className="w-px h-4 bg-[#E8EEF7]" />
-              <NavLink href="/settings">设置</NavLink>
+              <NavLink href="/settings">{t.nav.settings}</NavLink>
             </nav>
           </div>
         </header>

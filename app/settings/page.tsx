@@ -1,5 +1,6 @@
 import { getActiveModels } from "@/lib/queries";
 import { SettingsClient } from "./settings-client";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,10 @@ export default async function SettingsPage() {
           Settings
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332] mt-1">
-          设置
+          {t.settings.title}
         </h1>
         <p className="text-base text-[#6B7785] mt-1">
-          标记我方模型,对比页将以我方模型为中心展示
+          {t.settings.subtitle}
         </p>
       </div>
       <SettingsClient models={models} />

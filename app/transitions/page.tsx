@@ -1,5 +1,6 @@
 import { getTransitionCurves } from "@/lib/queries";
 import { TransitionsClient } from "./transitions-client";
+import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,10 @@ export default async function TransitionsPage() {
           Transitions
         </div>
         <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332] mt-1">
-          转付费分析
+          {t.nav.transitions}
         </h1>
         <p className="text-base text-[#6B7785] mt-1">
-          归一化到 D-1 = 100%,按转付费日期 D+0 对齐
+          {t.transitions.subtitle}
         </p>
       </div>
       <TransitionsClient curves={curves} />
