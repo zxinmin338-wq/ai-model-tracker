@@ -47,6 +47,8 @@ export default function RootLayout({
               <NavLink href="/compare">趋势对比</NavLink>
               <NavLink href="/transitions">转付费分析</NavLink>
               <NavLink href="/events">事件管理</NavLink>
+              <span className="w-px h-4 bg-[#E8EEF7]" />
+              <NavLink href="/settings">设置</NavLink>
             </nav>
           </div>
         </header>

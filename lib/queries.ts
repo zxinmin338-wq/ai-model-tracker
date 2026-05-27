@@ -16,6 +16,8 @@ export interface Model {
   current_status?: string;
   region?: string;
   discovered_at?: string;
+  is_own?: boolean;
+  provider?: string;
 }
 
 export interface ModelWithUsage extends Model {
