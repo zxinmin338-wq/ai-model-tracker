@@ -1,11 +1,11 @@
-import { getActiveModels } from "@/lib/queries";
+import { getRanking } from "@/lib/queries";
 import { CompareClient } from "./compare-client";
 import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function ComparePage() {
-  const models = await getActiveModels();
+  const models = await getRanking();
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">

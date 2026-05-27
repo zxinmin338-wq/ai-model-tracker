@@ -17,6 +17,7 @@ interface SeriesConfig {
   key: string;
   name: string;
   color: string;
+  strokeWidth?: number;
 }
 
 interface EventAnnotation {
@@ -46,7 +47,7 @@ export function TrendChart({
         className="flex items-center justify-center text-[#6B7785]"
         style={{ height }}
       >
-        No data available
+        暂无数据
       </div>
     );
   }
@@ -102,9 +103,9 @@ export function TrendChart({
             dataKey={s.key}
             name={s.name}
             stroke={s.color}
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            activeDot={{ r: 5 }}
+            strokeWidth={s.strokeWidth ?? 2}
+            dot={{ r: s.strokeWidth && s.strokeWidth > 2 ? 4 : 3 }}
+            activeDot={{ r: s.strokeWidth && s.strokeWidth > 2 ? 6 : 5 }}
             connectNulls
           />
         ))}

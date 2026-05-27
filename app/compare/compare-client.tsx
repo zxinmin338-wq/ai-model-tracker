@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendChart } from "@/components/trend-chart";
 import { PivotTable } from "@/components/pivot-table";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { t } from "@/lib/i18n";
-import type { Model, DailyUsagePoint } from "@/lib/queries";
+import type { ModelWithUsage, DailyUsagePoint } from "@/lib/queries";
 
 type Metric = "tokens" | "requests";
 type TimeRange = 7 | 14 | 30;
@@ -21,20 +22,84 @@ interface EventData {
   event_type?: string;
 }
 
-export function CompareClient({ models }: { models: Model[] }) {
-  // Default: top 3 by id (first 3)
+// ─── Recommendation algorithm ──────────────────────
+
+function scoreCompetitor(own: ModelWithUsage, candidate: ModelWithUsage): number {
+  let score = 0;
+
+  // 1. Same region (+3)
+  if (own.region && candidate.region && own.region === candidate.region) {
+    score += 3;
+  }
+
+  // 2. Similar volume: 0.3x - 3x of own tokens_7d (+2)
+  if (own.tokens_7d > 0 && candidate.tokens_7d > 0) {
+    const ratio = candidate.tokens_7d / own.tokens_7d;
+    if (ratio >= 0.3 && ratio <= 3) {
+      score += 2;
+    }
+  }
+
+  // 3. Same status (+1)
+  if (own.current_status && candidate.current_status &&
+      own.current_status === candidate.current_status) {
+    score += 1;
+  }
+
+  return score;
+}
+
+function getRecommendedSlugs(
+  models: ModelWithUsage[],
+  ownModels: ModelWithUsage[],
+  maxCount: number = 5
+): Set<string> {
+  if (ownModels.length === 0) return new Set();
+
+  const primaryOwn = ownModels[0]; // Use first own model as reference
+  const candidates = models.filter((m) => !m.is_own);
+
+  const scored = candidates.map((m) => ({
+    slug: m.permaslug,
+    score: scoreCompetitor(primaryOwn, m),
+    tokens: m.tokens_7d,
+  }));
+
+  // Sort by score desc, then by tokens_7d desc
+  scored.sort((a, b) => b.score - a.score || b.tokens - a.tokens);
+
+  return new Set(scored.slice(0, maxCount).map((s) => s.slug));
+}
+
+// ─── Component ─────────────────────────────────────
+
+export function CompareClient({ models }: { models: ModelWithUsage[] }) {
+  const ownModels = useMemo(() => models.filter((m) => m.is_own), [models]);
+  const otherModels = useMemo(() => models.filter((m) => !m.is_own), [models]);
+
+  // Recommended slugs
+  const recommendedSlugs = useMemo(
+    () => getRecommendedSlugs(models, ownModels),
+    [models, ownModels]
+  );
+
+  // Default selection: own models + recommended
   const [selected, setSelected] = useState<Set<string>>(() => {
     const initial = new Set<string>();
-    models.slice(0, 3).forEach((m) => initial.add(m.permaslug));
+    ownModels.forEach((m) => initial.add(m.permaslug));
+    recommendedSlugs.forEach((s) => initial.add(s));
     return initial;
   });
+
   const [metric, setMetric] = useState<Metric>("tokens");
   const [days, setDays] = useState<TimeRange>(7);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [series, setSeries] = useState<DailyUsagePoint[]>([]);
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showAllModels, setShowAllModels] = useState(false);
 
+  // Fetch data
   const fetchData = useCallback(async () => {
     const slugs = Array.from(selected);
     if (slugs.length === 0) {
@@ -48,7 +113,6 @@ export function CompareClient({ models }: { models: Model[] }) {
       const params = new URLSearchParams();
       slugs.forEach((s) => params.append("slugs", s));
       params.set("days", String(days));
-
       const res = await fetch(`/api/compare?${params.toString()}`);
       const json = await res.json();
       setSeries(json.series ?? []);
@@ -64,12 +128,17 @@ export function CompareClient({ models }: { models: Model[] }) {
     fetchData();
   }, [fetchData]);
 
+  // Toggle non-own models only
   const toggleModel = (slug: string) => {
+    // Own models are always selected
+    const isOwn = ownModels.some((m) => m.permaslug === slug);
+    if (isOwn) return;
+
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(slug)) {
         next.delete(slug);
-      } else if (next.size < 5) {
+      } else {
         next.add(slug);
       }
       return next;
@@ -77,12 +146,15 @@ export function CompareClient({ models }: { models: Model[] }) {
   };
 
   const selectedModels = models.filter((m) => selected.has(m.permaslug));
+  const ownSlugs = new Set(ownModels.map((m) => m.permaslug));
 
   // ─── Chart view data ──────────────────────────────
+
   const chartSeries = selectedModels.map((m) => ({
     key: metric === "tokens" ? m.permaslug : `${m.permaslug}_requests`,
-    name: m.display_name,
+    name: m.is_own ? `${m.display_name}（${t.common.own}）` : m.display_name,
     color: m.color_hex,
+    strokeWidth: m.is_own ? 3 : 2,
   }));
 
   const chartEvents = events
@@ -94,6 +166,7 @@ export function CompareClient({ models }: { models: Model[] }) {
     }));
 
   // ─── Pivot table data transform ───────────────────
+
   const pivotDates = useMemo(
     () => series.map((row) => row.date as string).sort(),
     [series]
@@ -131,32 +204,120 @@ export function CompareClient({ models }: { models: Model[] }) {
     [events, selected]
   );
 
+  // Split other models into recommended vs rest
+  const recommendedModels = otherModels.filter((m) =>
+    recommendedSlugs.has(m.permaslug)
+  );
+  const restModels = otherModels.filter(
+    (m) => !recommendedSlugs.has(m.permaslug)
+  );
+
   return (
     <div className="space-y-6">
-      {/* Model checkboxes */}
-      <div className="flex flex-wrap gap-4">
-        {models.map((m) => (
-          <label
-            key={m.permaslug}
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <Checkbox
-              checked={selected.has(m.permaslug)}
-              onCheckedChange={() => toggleModel(m.permaslug)}
-            />
-            <span
-              className="inline-block h-3 w-3 rounded-full shrink-0"
-              style={{ backgroundColor: m.color_hex }}
-            />
-            <span className="text-sm">
-              {m.is_own && "⭐ "}
-              {m.display_name}
+      {/* ─── Model Selector ─── */}
+      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6 space-y-5">
+        {/* Own models */}
+        {ownModels.length > 0 ? (
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wider text-[#94A0AE] mb-2">
+              {t.common.own}模型（必选）
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {ownModels.map((m) => (
+                <label
+                  key={m.permaslug}
+                  className="flex items-center gap-2 bg-[#FFF8E1] rounded-lg px-3 py-2"
+                >
+                  <Checkbox checked disabled className="opacity-60" />
+                  <span
+                    className="inline-block h-3 w-3 rounded-full shrink-0"
+                    style={{ backgroundColor: m.color_hex }}
+                  />
+                  <span className="text-sm font-medium text-[#1A2332]">
+                    ⭐ {m.display_name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* No own model prompt */
+          <div className="flex items-center gap-3 bg-[#FFF8E1] rounded-lg px-4 py-3">
+            <span className="text-sm text-[#6B7785]">
+              尚未标记我方模型。前往{" "}
+              <Link
+                href="/settings"
+                className="text-[#5B8DEF] hover:underline font-medium"
+              >
+                设置
+              </Link>
+              {" "}标记后，对比体验将以你方模型为中心。
             </span>
-          </label>
-        ))}
+          </div>
+        )}
+
+        {/* Recommended competitors */}
+        {recommendedModels.length > 0 && (
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wider text-[#94A0AE] mb-2">
+              推荐对比（按相关性排序）
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {recommendedModels.map((m) => (
+                <ModelCheckbox
+                  key={m.permaslug}
+                  model={m}
+                  checked={selected.has(m.permaslug)}
+                  onToggle={() => toggleModel(m.permaslug)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Expandable: all other models */}
+        {restModels.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowAllModels((v) => !v)}
+              className="text-sm text-[#5B8DEF] hover:text-[#4A7DDF] transition-colors flex items-center gap-1"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                className={`transition-transform ${showAllModels ? "rotate-90" : ""}`}
+              >
+                <path
+                  d="M5 3L9 7L5 11"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {showAllModels
+                ? "收起"
+                : `展开所有模型 (${restModels.length})`}
+            </button>
+            {showAllModels && (
+              <div className="flex flex-wrap gap-3 mt-3">
+                {restModels.map((m) => (
+                  <ModelCheckbox
+                    key={m.permaslug}
+                    model={m}
+                    checked={selected.has(m.permaslug)}
+                    onToggle={() => toggleModel(m.permaslug)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Controls */}
+      {/* ─── Controls ─── */}
       <div className="flex items-center gap-5 flex-wrap">
         <ControlGroup label="视图">
           <Tabs
@@ -196,7 +357,7 @@ export function CompareClient({ models }: { models: Model[] }) {
         </ControlGroup>
       </div>
 
-      {/* Content area */}
+      {/* ─── Content area ─── */}
       {loading ? (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
           <div className="flex items-center justify-center h-[300px] text-[#6B7785]">
@@ -263,7 +424,15 @@ export function CompareClient({ models }: { models: Model[] }) {
                         className="inline-block h-3 w-3 rounded-full shrink-0"
                         style={{ backgroundColor: m.color_hex }}
                       />
-                      <span className="text-sm flex-1">{m.display_name}</span>
+                      <span className="text-sm flex-1">
+                        {m.is_own && "⭐ "}
+                        {m.display_name}
+                        {m.is_own && (
+                          <span className="text-[#94A0AE] ml-1">
+                            （{t.common.own}）
+                          </span>
+                        )}
+                      </span>
                       <span className="text-sm font-mono">
                         {metric === "tokens"
                           ? formatTokens(total)
@@ -282,6 +451,30 @@ export function CompareClient({ models }: { models: Model[] }) {
 }
 
 // ─── Sub-components ─────────────────────────────────
+
+function ModelCheckbox({
+  model,
+  checked,
+  onToggle,
+}: {
+  model: ModelWithUsage;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <Checkbox checked={checked} onCheckedChange={onToggle} />
+      <span
+        className="inline-block h-3 w-3 rounded-full shrink-0"
+        style={{ backgroundColor: model.color_hex }}
+      />
+      <span className="text-sm text-[#1A2332]">{model.display_name}</span>
+      <span className="text-xs text-[#94A0AE]">
+        {formatTokens(model.tokens_7d)}
+      </span>
+    </label>
+  );
+}
 
 function ControlGroup({
   label,
