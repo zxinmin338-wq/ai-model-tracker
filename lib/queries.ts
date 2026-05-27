@@ -201,7 +201,6 @@ export async function getModelEvents(modelId: number): Promise<EventRecord[]> {
 export interface PeakValleyData {
   hour_utc: number;
   avg_delta: number;
-  sample_count: number;
 }
 
 export async function getHourlyDeltas(
