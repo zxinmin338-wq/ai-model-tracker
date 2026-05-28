@@ -123,8 +123,8 @@ export function ModelDetailClient({
     deprecated: "bg-[#FDECEA] text-[#E85B81]",
   };
 
-  const isNew = model.discovered_at &&
-    Date.now() - new Date(model.discovered_at).getTime() < 7 * 86400000;
+  const isNew = model.released_at &&
+    Date.now() - new Date(model.released_at).getTime() < 7 * 86400000;
 
   return (
     <div className="space-y-6">
@@ -164,12 +164,19 @@ export function ModelDetailClient({
         <p className="text-base text-[#6B7785] mt-1">
           {model.brand} · {model.permaslug}
         </p>
-        {(model.discovered_at || model.region) && (
-          <p className="text-sm text-[#94A0AE] mt-1">
-            {model.discovered_at && `${t.detail.discovered}: ${model.discovered_at.slice(0, 10)}`}
-            {model.discovered_at && model.region && " · "}
-            {model.region && `${t.detail.region}: ${model.region.charAt(0).toUpperCase() + model.region.slice(1)}`}
-          </p>
+        {(model.released_at || model.region || model.monitored_since) && (
+          <div className="text-sm text-[#94A0AE] mt-1 space-y-0.5">
+            {(model.released_at || model.region) && (
+              <p>
+                {model.released_at && `${t.detail.releasedAt}: ${model.released_at.slice(0, 10)}`}
+                {model.released_at && model.region && " · "}
+                {model.region && `${t.detail.region}: ${model.region.charAt(0).toUpperCase() + model.region.slice(1)}`}
+              </p>
+            )}
+            {model.monitored_since && (
+              <p>{t.detail.monitoredSince}: {model.monitored_since.slice(0, 10)}</p>
+            )}
+          </div>
         )}
       </div>
 

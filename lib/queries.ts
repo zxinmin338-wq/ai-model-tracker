@@ -15,7 +15,8 @@ export interface Model {
   is_active: boolean;
   current_status?: string;
   region?: string;
-  discovered_at?: string;
+  released_at?: string;
+  monitored_since?: string;
   is_own?: boolean;
   provider?: string;
 }

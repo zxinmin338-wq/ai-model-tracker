@@ -30,8 +30,8 @@ export function HomeClient({
   // KPI calculations
   const trackedCount = models.length;
   const newThisWeek = models.filter((m) => {
-    if (!m.discovered_at) return false;
-    const diff = Date.now() - new Date(m.discovered_at).getTime();
+    if (!m.released_at) return false;
+    const diff = Date.now() - new Date(m.released_at).getTime();
     return diff < 7 * 86400000;
   }).length;
   const freeToPaidThisWeek = recentEvents.filter(
@@ -191,8 +191,8 @@ export function HomeClient({
               {sorted.map((m, i) => {
                 const growth = growthPct(m);
                 const isNew =
-                  m.discovered_at &&
-                  Date.now() - new Date(m.discovered_at).getTime() < 7 * 86400000;
+                  m.released_at &&
+                  Date.now() - new Date(m.released_at).getTime() < 7 * 86400000;
 
                 return (
                   <tr
