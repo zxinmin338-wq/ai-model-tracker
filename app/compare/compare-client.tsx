@@ -406,27 +406,15 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
               />
               <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-[#E8EEF7] rounded-lg shadow-lg py-1 min-w-[180px]">
                 {viewMode === "table" ? (
-                  <>
-                    <ExportMenuItem
-                      label="导出表格 (CSV)"
-                      onClick={handleExportCSV}
-                    />
-                    <ExportMenuItem
-                      label="导出截图 (PNG)"
-                      onClick={handleExportPNG}
-                    />
-                  </>
+                  <ExportMenuItem
+                    label="导出表格 (CSV)"
+                    onClick={handleExportCSV}
+                  />
                 ) : (
-                  <>
-                    <ExportMenuItem
-                      label="导出图表 (PNG)"
-                      onClick={handleExportPNG}
-                    />
-                    <ExportMenuItem
-                      label="导出数据 (CSV)"
-                      onClick={handleExportCSV}
-                    />
-                  </>
+                  <ExportMenuItem
+                    label="导出图表 (PNG)"
+                    onClick={handleExportPNG}
+                  />
                 )}
               </div>
             </>
