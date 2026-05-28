@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendChart } from "@/components/trend-chart";
 import { PivotTable } from "@/components/pivot-table";
 import { formatTokens, formatRequests } from "@/lib/format";
+import { exportTableCSV, exportElementPNG, buildExportFilename } from "@/lib/export";
 import { t } from "@/lib/i18n";
 import type { ModelWithUsage, DailyUsagePoint } from "@/lib/queries";
 
@@ -98,6 +99,8 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAllModels, setShowAllModels] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -203,6 +206,34 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
         })),
     [events, selected]
   );
+
+  // ─── Export handlers ───────────────────────────────
+
+  const startDate = pivotDates[0] ?? "";
+  const endDate = pivotDates[pivotDates.length - 1] ?? "";
+
+  function handleExportCSV() {
+    setShowExportMenu(false);
+    exportTableCSV(
+      {
+        models: selectedModels,
+        dates: pivotDates,
+        data: pivotData,
+        events: pivotEvents,
+        metric,
+      },
+      buildExportFilename("compare", startDate, endDate, "csv")
+    );
+  }
+
+  async function handleExportPNG() {
+    setShowExportMenu(false);
+    if (!contentRef.current) return;
+    await exportElementPNG(
+      contentRef.current,
+      buildExportFilename("compare", startDate, endDate, "png")
+    );
+  }
 
   // Split other models into recommended vs rest
   const recommendedModels = otherModels.filter((m) =>
@@ -355,9 +386,56 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
             </TabsList>
           </Tabs>
         </ControlGroup>
+
+        {/* Export dropdown */}
+        <div className="relative ml-auto">
+          <button
+            onClick={() => setShowExportMenu((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium text-[#6B7785] hover:text-[#5B8DEF] border border-[#E8EEF7] rounded-lg px-3 py-1.5 bg-white transition-colors"
+          >
+            {t.common.export}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M3 5L6 8L9 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {showExportMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setShowExportMenu(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-[#E8EEF7] rounded-lg shadow-lg py-1 min-w-[180px]">
+                {viewMode === "table" ? (
+                  <>
+                    <ExportMenuItem
+                      label="导出表格 (CSV)"
+                      onClick={handleExportCSV}
+                    />
+                    <ExportMenuItem
+                      label="导出截图 (PNG)"
+                      onClick={handleExportPNG}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <ExportMenuItem
+                      label="导出图表 (PNG)"
+                      onClick={handleExportPNG}
+                    />
+                    <ExportMenuItem
+                      label="导出数据 (CSV)"
+                      onClick={handleExportCSV}
+                    />
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ─── Content area ─── */}
+      <div ref={contentRef}>
       {loading ? (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
           <div className="flex items-center justify-center h-[300px] text-[#6B7785]">
@@ -446,6 +524,7 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -490,5 +569,22 @@ function ControlGroup({
       </span>
       {children}
     </div>
+  );
+}
+
+function ExportMenuItem({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="w-full text-left px-3 py-2 text-sm text-[#1A2332] hover:bg-[#F0F4F8] transition-colors"
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
