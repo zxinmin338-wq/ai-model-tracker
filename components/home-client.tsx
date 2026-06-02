@@ -21,9 +21,8 @@ function formatProvider(provider: string | undefined | null): {
 } {
   if (!provider) return { short: "—", full: "" };
   const parts = provider.split(",").map((s) => s.trim());
-  if (parts.length <= 3) return { short: parts.join(", "), full: provider };
-  const shown = parts.slice(0, 3).join(", ");
-  return { short: `${shown} +${parts.length - 3} more`, full: provider };
+  if (parts.length === 1) return { short: parts[0], full: provider };
+  return { short: `${parts[0]} 等${parts.length}家`, full: provider };
 }
 
 function formatPlatforms(sources: string[]): string {
