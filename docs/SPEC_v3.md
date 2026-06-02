@@ -1,6 +1,9 @@
 # AI Model Tracker — Implementation Spec v3
 > 给 AI coding agent(Claude Code)的实施规格说明书。**严格按 Section 11 的 Batch 顺序执行,每个 Batch 完成后必须停下来等用户确认,不允许连续执行多个 Batch。不允许擅自添加 SPEC 没写的功能。**
 ---
+
+> 注：本 SPEC 主体（Section 1-13）定稿于 free 模型阶段；产品已于 2026-06 扩展为跨平台 + 付费监测。最新定位与口径见文末「当前迭代（2026-06）」。**主体与文末冲突处，一律以文末为准。**
+
 ## 1. v3 相比 v2 的变化
 | 维度 | v2 | v3 |
 |---|---|---|
@@ -640,7 +643,7 @@ INSERT INTO events (model_id, event_date, event_type, label, description) VALUES
 ## 12. Non-goals（MVP 不做）
 - ❌ 周报邮件订阅
 - ❌ 用户系统（登录、注册、权限）
-- ❌ 多平台数据源（ZenMux 等）
+- ❌ 多平台数据源（ZenMux 等）—— 已于 2026-06 迭代解除，见文末「当前迭代」
 - ❌ 数据导出 / 对外 API
 - ❌ 暗黑模式
 - ❌ i18n / 多语言切换（中文为主,部分 UI 词保留英文）
@@ -654,8 +657,70 @@ INSERT INTO events (model_id, event_date, event_type, label, description) VALUES
 1. **严格分批执行。** 完成 Batch 0 后停下来等用户确认 → 完成 Batch 1 后停下来 → 以此类推。**禁止连续执行多个 Batch。**
 2. **每个 Batch 完成后,主动输出该 Batch 的 acceptance checklist**,让用户逐项打勾确认。不要默认通过。
 3. **不允许擅自添加功能。** 任何 Section 12 列出的 Non-goals,即使想到了也不做。如果觉得某功能有价值,先在回复里提出建议,等用户同意后才能加。
-4. **不要重写已工作的代码。** `/compare` 和 `/transitions` 现有的核心逻辑（查询、状态、event annotation）已经能跑,**只允许在视觉（Batch 0）和明确 bug 修复（Batch 1 的 X 轴）处修改**,不允许重构。
+4. **不要重写已工作的代码。** `/compare` 和 `/transitions` 现有的核心逻辑（查询、状态、event annotation）已经能跑,**只允许在视觉（Batch 0）和明确 bug 修复（Batch 1 的 X 轴）处修改**,不允许重构。例外：2026-06 迭代的 Phase A 允许修改首页 / 与详情页 /model 的指标展示逻辑（单通道→free+paid 合计、支持下钻），此为已批准的范围变更。
 5. **遇到不确定的实现细节,问用户**,不要自己猜。例如：OpenRouter 的模型列表 API URL、permaslug 列表、events seed data 的具体日期等。
 6. **每个 Batch 完成后,git commit + push,commit message 用清晰的 "Batch N: <描述>"**,便于回滚。
 7. **保持视觉风格统一。** Batch 0 之后,所有新页面必须使用 Section 6 定义的视觉系统,不允许偏离。
 8. **本 SPEC 的 Section 编号是规范引用。** 用户说"看 Section 7.4" / "执行 Batch 2" 时,Claude Code 必须查阅对应内容,不要凭记忆。
+
+---
+
+## 当前迭代（2026-06）：定位扩展 — 跨平台 + 付费监测
+
+### 背景
+MVP 验证后发现两件事，触发定位扩展：
+1. 免费模型生命周期信号有限：CoBuddy 于 ~2026-05-27 从 free 转 paid（OpenRouter free 通道数据自此中断，后续将完全下架、仅千帆可调），免费监测的覆盖面收窄。
+2. 同期 ERNIE 5.x 等付费旗舰开始在非 OpenRouter 平台（AnyInt、ZenMux）出现，跨平台分布差异成为更有信息量的观察角度。
+
+定位从「免费模型生命周期监测」扩展为「AI 模型跨平台调用量监测」。免费监测线保留为子专题，新增付费 + 多平台。
+
+### 核心口径原则（本次迭代的地基，后续所有功能遵守）
+
+**原则 1 — 指标主口径 = 模型总量（所有通道合计）**
+OpenRouter 的 `:free` 与标准（paid）是同一底层模型的两条接入路径，非两个模型。不同模型把流量放在不同通道（推广型模型流量集中在 free，正经付费模型集中在 paid），因此任何单一通道的绝对值不可用于跨模型横向比较。
+- 横向对比「谁热」→ 用 free + paid **合计**
+- free/paid **构成比** → 作为商业模式 / 生命周期阶段的独立洞察维度
+- 单通道绝对值 → 仅用于同类模型内部或衰减分析，不跨类横向比
+
+**原则 2 — 数据分开存、聚合查询时算**
+free 与 paid 永远分开记录（`is_free` 区分），为原子数据，写入时绝不合并。合计为查询时实时聚合，保留最细粒度，任何衍生值读时计算（延续「存原始值、衍生值在查询层算」）。
+
+**原则 3 — 时间粒度按平台能力分层**
+- OpenRouter：小时级 fetch + 累计值作差 → 可出 3 小时波峰波谷（**单平台日内视图，OpenRouter 专属**）
+- AnyInt / ZenMux：上游仅提供日级明细，直接取日值，不作差
+- **跨平台对比统一降到日级**（三平台公约数）
+
+**原则 4 — 跨平台对齐用「总量」**
+三平台均以模型总调用量对齐：OpenRouter = free+paid 合计；AnyInt / ZenMux = 其接口返回的总量。口径一致方可横向比较。同一模型在不同平台可能是不同版本（OpenRouter 多为 ERNIE 4.5 系、ZenMux 为 5.0/x1.1、AnyInt 为 5.1），故主视图为「版本 × 平台」分布，而非强行合并同名曲线。
+
+### 监测对象
+| 平台 | 模型 | 通道 / 粒度 | 采集方式 |
+|---|---|---|---|
+| OpenRouter | ERNIE 4.5 系（含 VL）、CoBuddy（free+paid） | free + paid 双通道，小时级 | 现有 hourly fetch + 作差 |
+| AnyInt | ernie-5.1 | 日级明细 | 公开 API（dailyTokenUsage），免 token |
+| ZenMux | ernie-5.0 / x1.1 / image-turbo / 5.1 | 日级明细 | 接口需匿名 ctoken |
+
+### 数据模型 delta
+- `snapshots` 增列 `source`（默认 `openrouter`，回填历史）、`is_free`
+- 新增 `model_aliases`（同模型跨平台 slug 映射）
+- 既有 OpenRouter 采集 / 查询逻辑保持兼容
+
+### 分批落地（一次一块，跑通再下一步）
+- **Phase A — OpenRouter 双通道闭环（本次落地起点）**
+  - CoBuddy 补抓 paid variant；free 通道保留
+  - 排行榜 / 详情页主指标改为「合计」，支持下钻拆 free/paid
+  - events 记一条 `free_to_paid`（CoBuddy，date≈2026-05-27）
+  - 交付标准：同一模型 free 断、paid 接上的链路跑通；合计/拆分两种视图可切换
+- **Phase B — schema 加 source + 接 AnyInt**（日级，最简单的新平台）
+- **Phase C — 接 ZenMux**（日级 + ctoken）
+- **Phase D — 跨平台日级视图**（版本 × 平台分布图）
+
+### Backlog（本周期不做）
+- 竞品池扩充（国内主流 text model，往 models 表填行即可，不阻塞架构）
+- 模型搜索 + 动态追踪
+- 数据新鲜度验证机制（采集成功率 + 上游断流告警 —— CoBuddy 案例已暴露此需求）
+- 千帆官方口径（无公开 API，仅财报数字，作天花板参照手动维护）
+- ZenMux ctoken 获取方式的工程实现细节
+
+### 原 Batch 3/4 处理
+文末新迭代使用 Phase A-D 编号，与 Section 11 的 Batch 0-4 是两套独立编号；Section 11 原 Batch 3（LLM 分析）、Batch 4（自动发现）顺延，待 Phase A-D 完成后重新评估。

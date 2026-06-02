@@ -14,6 +14,7 @@ import type { ModelWithUsage, DailyUsagePoint } from "@/lib/queries";
 type Metric = "tokens" | "requests";
 type TimeRange = 7 | 14 | 30;
 type ViewMode = "table" | "chart";
+type Channel = "all" | "free" | "standard";
 
 interface EventData {
   permaslug: string;
@@ -95,6 +96,7 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
   const [metric, setMetric] = useState<Metric>("tokens");
   const [days, setDays] = useState<TimeRange>(7);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [channel, setChannel] = useState<Channel>("all");
   const [series, setSeries] = useState<DailyUsagePoint[]>([]);
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,6 +118,7 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
       const params = new URLSearchParams();
       slugs.forEach((s) => params.append("slugs", s));
       params.set("days", String(days));
+      params.set("channel", channel);
       const res = await fetch(`/api/compare?${params.toString()}`);
       const json = await res.json();
       setSeries(json.series ?? []);
@@ -125,7 +128,7 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
     } finally {
       setLoading(false);
     }
-  }, [selected, days]);
+  }, [selected, days, channel]);
 
   useEffect(() => {
     fetchData();
@@ -383,6 +386,19 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
               <TabsTrigger value="7">{t.range.days7}</TabsTrigger>
               <TabsTrigger value="14">{t.range.days14}</TabsTrigger>
               <TabsTrigger value="30">{t.range.days30}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </ControlGroup>
+
+        <ControlGroup label="通道">
+          <Tabs
+            value={channel}
+            onValueChange={(v) => setChannel(v as Channel)}
+          >
+            <TabsList>
+              <TabsTrigger value="all">合计</TabsTrigger>
+              <TabsTrigger value="free">Free</TabsTrigger>
+              <TabsTrigger value="standard">Paid</TabsTrigger>
             </TabsList>
           </Tabs>
         </ControlGroup>

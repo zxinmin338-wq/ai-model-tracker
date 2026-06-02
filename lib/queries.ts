@@ -92,7 +92,8 @@ export async function getRecentEvents(days: number = 7): Promise<EventRecord[]> 
 
 export async function getDailyUsage(
   permaslugs: string[],
-  days: 7 | 14 | 30
+  days: 7 | 14 | 30,
+  channel: "all" | "free" | "standard" = "all"
 ): Promise<{
   series: DailyUsagePoint[];
   events: Array<{
@@ -116,27 +117,30 @@ export async function getDailyUsage(
     models.map((m) => [m.permaslug, m.color_hex])
   );
 
-  // Get snapshots
-  const { data: snapshots } = await supabase
+  // Get snapshots — filter by channel if not "all"
+  let snapshotQuery = supabase
     .from("snapshots")
-    .select("model_id, usage_date, total_tokens, total_requests, captured_at")
+    .select("model_id, usage_date, total_tokens, total_requests, captured_at, is_free")
     .in("model_id", modelIds)
     .gte(
       "usage_date",
       new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
-    )
-    .order("captured_at", { ascending: false });
+    );
+  if (channel === "free") snapshotQuery = snapshotQuery.eq("is_free", true);
+  if (channel === "standard") snapshotQuery = snapshotQuery.eq("is_free", false);
+  const { data: snapshots } = await snapshotQuery.order("captured_at", { ascending: false });
 
-  // Deduplicate: keep latest snapshot per (model_id, usage_date)
+  // Deduplicate: keep latest snapshot per (model_id, usage_date, is_free)
   const seen = new Set<string>();
   const deduped = (snapshots ?? []).filter((s) => {
-    const key = `${s.model_id}_${s.usage_date}`;
+    const key = `${s.model_id}_${s.usage_date}_${s.is_free}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 
   // Build series: one row per date, columns per permaslug
+  // Sum free + standard for each (model, date) pair
   const dateMap = new Map<string, Record<string, number | string>>();
   for (const s of deduped) {
     const slug = slugById[s.model_id];
@@ -146,8 +150,8 @@ export async function getDailyUsage(
       dateMap.set(date, { date });
     }
     const row = dateMap.get(date)!;
-    row[slug] = s.total_tokens;
-    row[`${slug}_requests`] = s.total_requests;
+    row[slug] = ((row[slug] as number) || 0) + s.total_tokens;
+    row[`${slug}_requests`] = ((row[`${slug}_requests`] as number) || 0) + s.total_requests;
   }
 
   const series = (Array.from(dateMap.values()) as DailyUsagePoint[]).sort(
@@ -281,22 +285,23 @@ export async function getTransitionCurves(): Promise<TransitionCurve[]> {
       .toISOString()
       .slice(0, 10);
 
-    // Get snapshots in range
+    // Get snapshots in range (both channels)
     const { data: snapshots } = await supabase
       .from("snapshots")
-      .select("usage_date, total_tokens, captured_at")
+      .select("usage_date, total_tokens, captured_at, is_free")
       .eq("model_id", model.id)
       .gte("usage_date", rangeStart)
       .lte("usage_date", rangeEnd)
       .order("captured_at", { ascending: false });
 
-    // Deduplicate per date
+    // Deduplicate per (date, is_free), then sum channels per date
     const seen = new Set<string>();
     const byDate = new Map<string, number>();
     for (const s of snapshots ?? []) {
-      if (seen.has(s.usage_date)) continue;
-      seen.add(s.usage_date);
-      byDate.set(s.usage_date, s.total_tokens);
+      const dedupKey = `${s.usage_date}_${s.is_free}`;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      byDate.set(s.usage_date, (byDate.get(s.usage_date) ?? 0) + s.total_tokens);
     }
 
     // Get D-1 value for normalization
