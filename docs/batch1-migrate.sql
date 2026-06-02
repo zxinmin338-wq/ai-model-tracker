@@ -1,5 +1,16 @@
 -- Batch 1: ALTER models table + update RPC
 -- Run this in Supabase SQL Editor
+--
+-- ⚠️ STALE / DO NOT RE-RUN AS-IS ⚠️
+-- This file does NOT reflect the live schema/RPC. Key drifts:
+--   * It adds/uses a `discovered_at` column that does NOT exist in the live
+--     `models` table — the live table uses `released_at` + `monitored_since`.
+--   * Its `get_ranking_7d` definition is OUTDATED. The live function was later
+--     changed to dedup by (model_id, usage_date, is_free, source) and SUM all
+--     channels+sources per day.
+-- ➜ The authoritative get_ranking_7d definition now lives in:
+--     docs/batch2-unify-ranking-aggregation.sql
+-- Kept here only as a historical record of what was attempted.
 
 -- 1. Add new columns to models
 ALTER TABLE models ADD COLUMN IF NOT EXISTS discovered_at TIMESTAMPTZ DEFAULT NOW();
