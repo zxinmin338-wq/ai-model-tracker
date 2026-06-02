@@ -9,12 +9,35 @@ import type { ModelWithUsage, EventRecord } from "@/lib/queries";
 type SortKey = "tokens_7d" | "growth";
 type SortDir = "asc" | "desc";
 
+const SOURCE_LABELS: Record<string, string> = {
+  openrouter: "OpenRouter",
+  anyint: "AnyInt",
+  zenmux: "ZenMux",
+};
+
+function formatProvider(provider: string | undefined | null): {
+  short: string;
+  full: string;
+} {
+  if (!provider) return { short: "—", full: "" };
+  const parts = provider.split(",").map((s) => s.trim());
+  if (parts.length <= 3) return { short: parts.join(", "), full: provider };
+  const shown = parts.slice(0, 3).join(", ");
+  return { short: `${shown} +${parts.length - 3} more`, full: provider };
+}
+
+function formatPlatforms(sources: string[]): string {
+  return sources.map((s) => SOURCE_LABELS[s] ?? s).join(", ") || "—";
+}
+
 export function HomeClient({
   models,
   recentEvents,
+  platforms,
 }: {
   models: ModelWithUsage[];
   recentEvents: EventRecord[];
+  platforms: Record<number, string[]>;
 }) {
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -168,6 +191,12 @@ export function HomeClient({
                   {t.table.brand}
                 </th>
                 <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
+                  {t.table.provider}
+                </th>
+                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
+                  平台
+                </th>
+                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
                   {t.table.status}
                 </th>
                 <th
@@ -220,6 +249,21 @@ export function HomeClient({
                       </Link>
                     </td>
                     <td className="py-3 px-2 text-[#6B7785]">{m.brand}</td>
+                    <td className="py-3 px-2 text-[#6B7785] max-w-[180px]">
+                      {(() => {
+                        const p = formatProvider(m.provider);
+                        return p.full ? (
+                          <span title={p.full} className="cursor-default">
+                            {p.short}
+                          </span>
+                        ) : (
+                          <span>{p.short}</span>
+                        );
+                      })()}
+                    </td>
+                    <td className="py-3 px-2 text-[#6B7785] whitespace-nowrap">
+                      {formatPlatforms(platforms[m.id] ?? [])}
+                    </td>
                     <td className="py-3 px-2">
                       <span
                         className={`text-xs font-medium px-2 py-0.5 rounded-md ${
@@ -255,7 +299,7 @@ export function HomeClient({
               {sorted.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={9}
                     className="text-center text-[#6B7785] py-8"
                   >
                     {t.common.noData}

@@ -221,6 +221,37 @@ export async function getHourlyDeltas(
   return data ?? [];
 }
 
+// ─── Model platforms (distinct sources per model) ────
+
+export async function getModelPlatforms(): Promise<Record<number, string[]>> {
+  // Query only active models and their distinct sources
+  const { data: models } = await supabase
+    .from("models")
+    .select("id")
+    .eq("is_active", true);
+
+  if (!models) return {};
+
+  const result: Record<number, string[]> = {};
+  for (const m of models) {
+    const { data } = await supabase
+      .from("snapshots")
+      .select("source")
+      .eq("model_id", m.id)
+      .limit(100);
+
+    const sources = new Set<string>();
+    for (const row of data ?? []) {
+      sources.add(row.source);
+    }
+    if (sources.size > 0) {
+      result[m.id] = Array.from(sources).sort();
+    }
+  }
+
+  return result;
+}
+
 // ─── All active models (for checkboxes) ─────────────
 
 export async function getActiveModels(): Promise<Model[]> {
