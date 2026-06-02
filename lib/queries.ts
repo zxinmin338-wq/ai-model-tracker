@@ -120,7 +120,7 @@ export async function getDailyUsage(
   // Get snapshots — filter by channel if not "all"
   let snapshotQuery = supabase
     .from("snapshots")
-    .select("model_id, usage_date, total_tokens, total_requests, captured_at, is_free")
+    .select("model_id, usage_date, total_tokens, total_requests, captured_at, is_free, source")
     .in("model_id", modelIds)
     .gte(
       "usage_date",
@@ -130,10 +130,10 @@ export async function getDailyUsage(
   if (channel === "standard") snapshotQuery = snapshotQuery.eq("is_free", false);
   const { data: snapshots } = await snapshotQuery.order("captured_at", { ascending: false });
 
-  // Deduplicate: keep latest snapshot per (model_id, usage_date, is_free)
+  // Deduplicate: keep latest snapshot per (model_id, usage_date, is_free, source)
   const seen = new Set<string>();
   const deduped = (snapshots ?? []).filter((s) => {
-    const key = `${s.model_id}_${s.usage_date}_${s.is_free}`;
+    const key = `${s.model_id}_${s.usage_date}_${s.is_free}_${s.source}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -288,17 +288,17 @@ export async function getTransitionCurves(): Promise<TransitionCurve[]> {
     // Get snapshots in range (both channels)
     const { data: snapshots } = await supabase
       .from("snapshots")
-      .select("usage_date, total_tokens, captured_at, is_free")
+      .select("usage_date, total_tokens, captured_at, is_free, source")
       .eq("model_id", model.id)
       .gte("usage_date", rangeStart)
       .lte("usage_date", rangeEnd)
       .order("captured_at", { ascending: false });
 
-    // Deduplicate per (date, is_free), then sum channels per date
+    // Deduplicate per (date, is_free, source), then sum per date
     const seen = new Set<string>();
     const byDate = new Map<string, number>();
     for (const s of snapshots ?? []) {
-      const dedupKey = `${s.usage_date}_${s.is_free}`;
+      const dedupKey = `${s.usage_date}_${s.is_free}_${s.source}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       byDate.set(s.usage_date, (byDate.get(s.usage_date) ?? 0) + s.total_tokens);

@@ -1,13 +1,19 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { fetchModelActivity } from "@/lib/openrouter";
+import { fetchAnyIntActivity } from "@/lib/anyint";
 
 export const dynamic = "force-dynamic";
 
-const VARIANTS = [
+const OR_VARIANTS = [
   { variant: "free", is_free: true },
   { variant: "standard", is_free: false },
 ] as const;
+
+// AnyInt models: permaslug in our DB → slug on AnyInt
+const ANYINT_MODELS: Record<string, string> = {
+  "ernie-5.1": "ernie-5.1",
+};
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -24,7 +30,7 @@ export async function POST(request: NextRequest) {
   // Get all active models
   const { data: models, error: modelsError } = await supabase
     .from("models")
-    .select("id, permaslug")
+    .select("id, permaslug, provider")
     .eq("is_active", true);
 
   if (modelsError || !models) {
@@ -38,11 +44,12 @@ export async function POST(request: NextRequest) {
   const errors: string[] = [];
 
   for (const model of models) {
-    for (const { variant, is_free } of VARIANTS) {
-      try {
-        const records = await fetchModelActivity(model.permaslug, variant);
+    const anyintSlug = ANYINT_MODELS[model.permaslug];
 
-        // Empty channel → skip silently (e.g. CoBuddy free channel after transition)
+    if (anyintSlug) {
+      // ─── AnyInt source ───
+      try {
+        const records = await fetchAnyIntActivity(anyintSlug);
         if (records.length === 0) continue;
 
         const rows = records.map((r) => ({
@@ -51,7 +58,8 @@ export async function POST(request: NextRequest) {
           usage_date: r.usage_date,
           total_tokens: r.total_tokens,
           total_requests: r.total_requests,
-          is_free,
+          is_free: false,
+          source: "anyint",
         }));
 
         const { error: insertError } = await supabase
@@ -59,14 +67,46 @@ export async function POST(request: NextRequest) {
           .insert(rows);
 
         if (insertError) {
-          errors.push(`${model.permaslug}[${variant}]: ${insertError.message}`);
+          errors.push(`${model.permaslug}[anyint]: ${insertError.message}`);
         } else {
           inserted += rows.length;
         }
       } catch (e) {
         errors.push(
-          `${model.permaslug}[${variant}]: ${e instanceof Error ? e.message : String(e)}`
+          `${model.permaslug}[anyint]: ${e instanceof Error ? e.message : String(e)}`
         );
+      }
+    } else {
+      // ─── OpenRouter source (free + standard) ───
+      for (const { variant, is_free } of OR_VARIANTS) {
+        try {
+          const records = await fetchModelActivity(model.permaslug, variant);
+          if (records.length === 0) continue;
+
+          const rows = records.map((r) => ({
+            model_id: model.id,
+            captured_at: capturedAt,
+            usage_date: r.usage_date,
+            total_tokens: r.total_tokens,
+            total_requests: r.total_requests,
+            is_free,
+            source: "openrouter",
+          }));
+
+          const { error: insertError } = await supabase
+            .from("snapshots")
+            .insert(rows);
+
+          if (insertError) {
+            errors.push(`${model.permaslug}[${variant}]: ${insertError.message}`);
+          } else {
+            inserted += rows.length;
+          }
+        } catch (e) {
+          errors.push(
+            `${model.permaslug}[${variant}]: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
       }
     }
   }
@@ -75,7 +115,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     inserted,
     models_processed: models.length,
-    channels: "free + standard",
+    sources: "openrouter (free+standard) + anyint",
     errors: errors.length > 0 ? errors : undefined,
     captured_at: capturedAt,
   });
