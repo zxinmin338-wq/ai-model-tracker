@@ -264,8 +264,17 @@ export function PivotTable({
                 <td className="py-3 px-4 text-[#6B7785]">{m.brand}</td>
 
                 {/* Provider */}
-                <td className="py-3 px-4 text-[#6B7785]">
-                  {m.provider || "—"}
+                <td className="py-3 px-4 text-[#6B7785] max-w-[140px]">
+                  {(() => {
+                    if (!m.provider) return "—";
+                    const parts = m.provider.split(",").map((s) => s.trim());
+                    if (parts.length === 1) return parts[0];
+                    return (
+                      <span title={m.provider} className="cursor-default">
+                        {parts[0]} 等{parts.length}家
+                      </span>
+                    );
+                  })()}
                 </td>
 
                 {/* Cumulative */}
