@@ -3,6 +3,7 @@ import {
   getModelBySlug,
   getModelEvents,
   getHourlyDeltas,
+  hasHourlyData,
 } from "@/lib/queries";
 import { ModelDetailClient } from "./model-detail-client";
 
@@ -19,9 +20,10 @@ export default async function ModelDetailPage({
 
   if (!model) return notFound();
 
-  const [events, hourlyDeltas] = await Promise.all([
+  const [events, hourlyDeltas, hourlyAvailable] = await Promise.all([
     getModelEvents(model.id),
     getHourlyDeltas(model.id),
+    hasHourlyData(model.id),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function ModelDetailPage({
         model={model}
         events={events}
         hourlyDeltas={hourlyDeltas}
+        hasHourlyData={hourlyAvailable}
       />
     </div>
   );

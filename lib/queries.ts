@@ -221,6 +221,23 @@ export async function getHourlyDeltas(
   return data ?? [];
 }
 
+// Whether a model has any OpenRouter snapshots — the only source with real
+// hourly/cumulative data. Used to decide if the 24h-distribution block is
+// meaningful (daily-grain anyint/zenmux models have no hourly resolution).
+export async function hasHourlyData(modelId: number): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("snapshots")
+    .select("id")
+    .eq("model_id", modelId)
+    .eq("source", "openrouter")
+    .limit(1);
+  if (error) {
+    console.error("hasHourlyData error:", error);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
 // ─── Model platforms (distinct sources per model) ────
 
 export async function getModelPlatforms(): Promise<Record<number, string[]>> {

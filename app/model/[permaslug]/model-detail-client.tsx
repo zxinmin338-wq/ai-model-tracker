@@ -60,10 +60,12 @@ export function ModelDetailClient({
   model,
   events,
   hourlyDeltas,
+  hasHourlyData,
 }: {
   model: Model;
   events: EventRecord[];
   hourlyDeltas: PeakValleyData[];
+  hasHourlyData: boolean;
 }) {
   const [metric, setMetric] = useState<Metric>("tokens");
   const [days, setDays] = useState<TimeRange>(7);
@@ -213,6 +215,14 @@ export function ModelDetailClient({
           <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
             {t.common.loading}
           </div>
+        ) : series.length === 0 ? (
+          <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
+            {channel === "free"
+              ? t.detail.noFreeData
+              : channel === "standard"
+              ? t.detail.noStandardData
+              : t.common.noData}
+          </div>
         ) : (
           <TrendChart
             data={series}
@@ -223,8 +233,13 @@ export function ModelDetailClient({
         )}
       </div>
 
-      {/* 3-Hour Distribution Bar Chart */}
-      {validBuckets.length > 0 ? (
+      {/* 3-Hour Distribution Bar Chart — only meaningful for sources with real
+          hourly data (OpenRouter). Daily-grain models (anyint/zenmux) get a note. */}
+      {!hasHourlyData ? (
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center">
+          <p className="text-[#6B7785]">{t.detail.noHourlyData}</p>
+        </div>
+      ) : validBuckets.length > 0 ? (
         <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
           <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
             Distribution
@@ -313,7 +328,7 @@ export function ModelDetailClient({
       )}
 
       {/* Multi-timezone Peak / Valley Cards (3-hour windows) */}
-      {peakBucket && valleyBucket && (
+      {hasHourlyData && peakBucket && valleyBucket && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <PeakValley3hCard
             title={`${t.peakValley.peak} ${t.peakValley.peakSuffix}`}
