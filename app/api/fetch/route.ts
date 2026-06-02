@@ -4,6 +4,11 @@ import { fetchModelActivity } from "@/lib/openrouter";
 
 export const dynamic = "force-dynamic";
 
+const VARIANTS = [
+  { variant: "free", is_free: true },
+  { variant: "standard", is_free: false },
+] as const;
+
 export async function POST(request: NextRequest) {
   // Auth check
   const authHeader = request.headers.get("authorization");
@@ -33,35 +38,36 @@ export async function POST(request: NextRequest) {
   const errors: string[] = [];
 
   for (const model of models) {
-    try {
-      const records = await fetchModelActivity(model.permaslug);
+    for (const { variant, is_free } of VARIANTS) {
+      try {
+        const records = await fetchModelActivity(model.permaslug, variant);
 
-      if (records.length === 0) {
-        errors.push(`${model.permaslug}: no records returned`);
-        continue;
+        // Empty channel → skip silently (e.g. CoBuddy free channel after transition)
+        if (records.length === 0) continue;
+
+        const rows = records.map((r) => ({
+          model_id: model.id,
+          captured_at: capturedAt,
+          usage_date: r.usage_date,
+          total_tokens: r.total_tokens,
+          total_requests: r.total_requests,
+          is_free,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("snapshots")
+          .insert(rows);
+
+        if (insertError) {
+          errors.push(`${model.permaslug}[${variant}]: ${insertError.message}`);
+        } else {
+          inserted += rows.length;
+        }
+      } catch (e) {
+        errors.push(
+          `${model.permaslug}[${variant}]: ${e instanceof Error ? e.message : String(e)}`
+        );
       }
-
-      const rows = records.map((r) => ({
-        model_id: model.id,
-        captured_at: capturedAt,
-        usage_date: r.usage_date,
-        total_tokens: r.total_tokens,
-        total_requests: r.total_requests,
-      }));
-
-      const { error: insertError } = await supabase
-        .from("snapshots")
-        .insert(rows);
-
-      if (insertError) {
-        errors.push(`${model.permaslug}: ${insertError.message}`);
-      } else {
-        inserted += rows.length;
-      }
-    } catch (e) {
-      errors.push(
-        `${model.permaslug}: ${e instanceof Error ? e.message : String(e)}`
-      );
     }
   }
 
@@ -69,6 +75,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     inserted,
     models_processed: models.length,
+    channels: "free + standard",
     errors: errors.length > 0 ? errors : undefined,
     captured_at: capturedAt,
   });
