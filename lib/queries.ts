@@ -287,6 +287,30 @@ export async function hasHourlyData(modelId: number): Promise<boolean> {
   return (data?.length ?? 0) > 0;
 }
 
+// ─── Ranking breakdown (Homepage platform/channel filters) ────
+
+export interface RankingBreakdownRow {
+  model_id: number;
+  source: string;
+  is_free: boolean;
+  tokens_7d: number;
+  tokens_prev_7d: number;
+  requests_7d: number;
+}
+
+// Per-(model, source, channel) 7d / prev-7d token + request totals.
+// Lets the homepage re-scope the displayed tokens when a platform/channel
+// filter is active. Summing every row of a model == its get_ranking_7d total,
+// so the unfiltered ("all/all") view stays identical.
+export async function getRankingBreakdown(): Promise<RankingBreakdownRow[]> {
+  const { data, error } = await supabase.rpc("get_ranking_breakdown_7d");
+  if (error) {
+    console.error("getRankingBreakdown error:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
 // ─── Model platforms (distinct sources per model) ────
 
 export async function getModelPlatforms(): Promise<Record<number, string[]>> {

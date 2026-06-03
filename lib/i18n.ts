@@ -114,6 +114,8 @@ export const t = {
     brand: '公司',
     status: '状态',
     region: '发行地区',
+    platform: '平台',
+    channel: '通道',
     china: '中国',
     us: '美国',
     europe: '欧洲',

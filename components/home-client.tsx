@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { t } from "@/lib/i18n";
-import type { ModelWithUsage, EventRecord } from "@/lib/queries";
+import type { ModelWithUsage, EventRecord, RankingBreakdownRow } from "@/lib/queries";
 
 type SortKey = "tokens_7d" | "growth";
 type SortDir = "asc" | "desc";
@@ -29,20 +29,69 @@ function formatPlatforms(sources: string[]): string {
   return sources.map((s) => SOURCE_LABELS[s] ?? s).join(", ") || "—";
 }
 
+type PlatformFilter = "all" | "openrouter" | "anyint" | "zenmux";
+type ChannelFilter = "all" | "free" | "paid";
+
 export function HomeClient({
   models,
   recentEvents,
   platforms,
+  breakdown,
 }: {
   models: ModelWithUsage[];
   recentEvents: EventRecord[];
   platforms: Record<number, string[]>;
+  breakdown: RankingBreakdownRow[];
 }) {
   const [brandFilter, setBrandFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>("all");
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("tokens_7d");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // Group breakdown rows by model for fast lookup
+  const breakdownByModel = useMemo(() => {
+    const map: Record<number, RankingBreakdownRow[]> = {};
+    for (const r of breakdown) {
+      (map[r.model_id] ??= []).push(r);
+    }
+    return map;
+  }, [breakdown]);
+
+  const filterActive = platformFilter !== "all" || channelFilter !== "all";
+
+  // Displayed metrics for a model, re-scoped to the active platform/channel
+  // filter. When neither filter is active, use the precomputed cross-source/
+  // channel totals so the default view is byte-identical to before.
+  const metricsFor = (m: ModelWithUsage) => {
+    if (!filterActive) {
+      return {
+        tokens: m.tokens_7d,
+        prev: m.tokens_prev_7d,
+        requests: m.requests_7d,
+        hasData: true,
+      };
+    }
+    const rows = (breakdownByModel[m.id] ?? []).filter((r) => {
+      if (platformFilter !== "all" && r.source !== platformFilter) return false;
+      if (channelFilter === "free" && r.is_free !== true) return false;
+      if (channelFilter === "paid" && r.is_free !== false) return false;
+      return true;
+    });
+    let tokens = 0;
+    let prev = 0;
+    let requests = 0;
+    for (const r of rows) {
+      tokens += r.tokens_7d;
+      prev += r.tokens_prev_7d;
+      requests += r.requests_7d;
+    }
+    // "Has data on this platform/channel" — appears in the ranking only if it
+    // actually had activity in the current window.
+    const hasData = tokens > 0 || requests > 0;
+    return { tokens, prev, requests, hasData };
+  };
 
   const brands = useMemo(
     () => Array.from(new Set(models.map((m) => m.brand))).sort(),
@@ -61,17 +110,24 @@ export function HomeClient({
   ).length;
   const totalTokens7d = models.reduce((sum, m) => sum + m.tokens_7d, 0);
 
-  // Growth % calc
-  function growthPct(m: ModelWithUsage): number | null {
-    if (!m.tokens_prev_7d || m.tokens_prev_7d === 0) return null;
-    return ((m.tokens_7d - m.tokens_prev_7d) / m.tokens_prev_7d) * 100;
+  // Growth % from a (tokens, prev) pair
+  function growthPct(tokens: number, prev: number): number | null {
+    if (!prev || prev === 0) return null;
+    return ((tokens - prev) / prev) * 100;
   }
 
+  // Decorate each model with its (possibly re-scoped) metrics
+  const decorated = models.map((m) => {
+    const mm = metricsFor(m);
+    return { m, ...mm, growth: growthPct(mm.tokens, mm.prev) };
+  });
+
   // Filter
-  const filtered = models.filter((m) => {
+  const filtered = decorated.filter(({ m, hasData }) => {
     if (brandFilter !== "all" && m.brand !== brandFilter) return false;
-    if (statusFilter !== "all" && m.current_status !== statusFilter) return false;
     if (regionFilter !== "all" && m.region !== regionFilter) return false;
+    // Platform/channel filter: only models with data on that platform/channel
+    if (filterActive && !hasData) return false;
     return true;
   });
 
@@ -79,10 +135,10 @@ export function HomeClient({
   const sorted = [...filtered].sort((a, b) => {
     let cmp = 0;
     if (sortKey === "tokens_7d") {
-      cmp = a.tokens_7d - b.tokens_7d;
+      cmp = a.tokens - b.tokens;
     } else {
-      const ga = growthPct(a) ?? -Infinity;
-      const gb = growthPct(b) ?? -Infinity;
+      const ga = a.growth ?? -Infinity;
+      const gb = b.growth ?? -Infinity;
       cmp = ga - gb;
     }
     return sortDir === "desc" ? -cmp : cmp;
@@ -99,20 +155,6 @@ export function HomeClient({
 
   const sortArrow = (key: SortKey) =>
     sortKey === key ? (sortDir === "desc" ? " ↓" : " ↑") : "";
-
-  // Status badge
-  const statusColors: Record<string, string> = {
-    free: "bg-[#E8EEF7] text-[#5B8DEF]",
-    paid: "bg-[#F0F4F8] text-[#6B7785]",
-    transitioning: "bg-[#FFF3E0] text-[#F0A856]",
-    deprecated: "bg-[#FDECEA] text-[#E85B81]",
-  };
-  const statusLabels: Record<string, string> = {
-    free: t.status.free,
-    paid: t.status.paid,
-    transitioning: t.status.transitioning,
-    deprecated: t.status.deprecated,
-  };
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">
@@ -152,17 +194,6 @@ export function HomeClient({
             options={[{ value: "all", label: t.common.all }, ...brands.map((b) => ({ value: b, label: b }))]}
           />
           <FilterSelect
-            label={t.filter.status}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={[
-              { value: "all", label: t.common.all },
-              { value: "free", label: t.status.free },
-              { value: "paid", label: t.status.paid },
-              { value: "transitioning", label: t.status.transitioning },
-            ]}
-          />
-          <FilterSelect
             label={t.filter.region}
             value={regionFilter}
             onChange={setRegionFilter}
@@ -171,6 +202,27 @@ export function HomeClient({
               { value: "china", label: t.filter.china },
               { value: "us", label: t.filter.us },
               { value: "europe", label: t.filter.europe },
+            ]}
+          />
+          <FilterSelect
+            label={t.filter.platform}
+            value={platformFilter}
+            onChange={(v) => setPlatformFilter(v as PlatformFilter)}
+            options={[
+              { value: "all", label: t.common.all },
+              { value: "openrouter", label: "OpenRouter" },
+              { value: "anyint", label: "AnyInt" },
+              { value: "zenmux", label: "ZenMux" },
+            ]}
+          />
+          <FilterSelect
+            label={t.filter.channel}
+            value={channelFilter}
+            onChange={(v) => setChannelFilter(v as ChannelFilter)}
+            options={[
+              { value: "all", label: t.common.all },
+              { value: "free", label: t.status.free },
+              { value: "paid", label: t.status.paid },
             ]}
           />
         </div>
@@ -195,9 +247,6 @@ export function HomeClient({
                 <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
                   平台
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
-                  {t.table.status}
-                </th>
                 <th
                   className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
                   onClick={() => toggleSort("tokens_7d")}
@@ -216,8 +265,7 @@ export function HomeClient({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((m, i) => {
-                const growth = growthPct(m);
+              {sorted.map(({ m, tokens, requests, growth }, i) => {
                 const isNew =
                   m.released_at &&
                   Date.now() - new Date(m.released_at).getTime() < 7 * 86400000;
@@ -263,20 +311,11 @@ export function HomeClient({
                     <td className="py-3 px-2 text-[#6B7785] whitespace-nowrap">
                       {formatPlatforms(platforms[m.id] ?? [])}
                     </td>
-                    <td className="py-3 px-2">
-                      <span
-                        className={`text-xs font-medium px-2 py-0.5 rounded-md ${
-                          statusColors[m.current_status ?? "free"] ?? statusColors.free
-                        }`}
-                      >
-                        {statusLabels[m.current_status ?? "free"] ?? t.status.free}
-                      </span>
+                    <td className="py-3 px-2 text-right font-mono text-[#1A2332]">
+                      {formatTokens(tokens)}
                     </td>
                     <td className="py-3 px-2 text-right font-mono text-[#1A2332]">
-                      {formatTokens(m.tokens_7d)}
-                    </td>
-                    <td className="py-3 px-2 text-right font-mono text-[#1A2332]">
-                      {formatRequests(m.requests_7d)}
+                      {formatRequests(requests)}
                     </td>
                     <td className="py-3 px-2 text-right font-mono">
                       {growth !== null ? (
@@ -298,7 +337,7 @@ export function HomeClient({
               {sorted.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={8}
                     className="text-center text-[#6B7785] py-8"
                   >
                     {t.common.noData}

@@ -1,13 +1,19 @@
-import { getRanking, getRecentEvents, getModelPlatforms } from "@/lib/queries";
+import {
+  getRanking,
+  getRecentEvents,
+  getModelPlatforms,
+  getRankingBreakdown,
+} from "@/lib/queries";
 import { HomeClient } from "@/components/home-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [models, recentEvents, platforms] = await Promise.all([
+  const [models, recentEvents, platforms, breakdown] = await Promise.all([
     getRanking(),
     getRecentEvents(7),
     getModelPlatforms(),
+    getRankingBreakdown(),
   ]);
 
   return (
@@ -15,6 +21,7 @@ export default async function HomePage() {
       models={models}
       recentEvents={recentEvents}
       platforms={platforms}
+      breakdown={breakdown}
     />
   );
 }
