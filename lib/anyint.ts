@@ -28,7 +28,9 @@ export interface AnyIntUsageRecord {
 /**
  * Fetch daily usage for a model from AnyInt.
  *
- * Token calculation: promptTokens + completionTokens + reasoningTokens.
+ * Token calculation: promptTokens + completionTokens — unified with the
+ * OpenRouter/ZenMux convention (prompt + completion only).
+ * reasoningTokens is NOT added (excluded to match the common token metric).
  * cachedReadTokens / cacheWriteTokens are NOT added — they represent
  * cache-served subsets of prompt/completion and would double-count.
  */
@@ -66,10 +68,7 @@ export async function fetchAnyIntActivity(
         .filter((r) => r.date && r.totalRequests > 0)
         .map((r) => ({
           usage_date: r.date.slice(0, 10),
-          total_tokens:
-            (r.promptTokens ?? 0) +
-            (r.completionTokens ?? 0) +
-            (r.reasoningTokens ?? 0),
+          total_tokens: (r.promptTokens ?? 0) + (r.completionTokens ?? 0),
           total_requests: r.totalRequests ?? 0,
         }));
     } catch (e) {
