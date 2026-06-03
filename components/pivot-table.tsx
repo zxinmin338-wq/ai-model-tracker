@@ -31,12 +31,26 @@ export interface PivotTableProps {
   /** permaslug → date → value (null = missing) */
   data: Record<string, Record<string, number | null>>;
   events: PivotEvent[];
+  /** model id → data-source platforms (e.g. ["anyint","zenmux"]) */
+  platforms?: Record<number, string[]>;
 }
 
 // ─── Helpers ───────────────────────────────────────
 
 function fmtDate(d: string): string {
   return d.slice(5); // 'YYYY-MM-DD' → 'MM-DD'
+}
+
+// data-source key → display name
+const PLATFORM_LABELS: Record<string, string> = {
+  openrouter: "OpenRouter",
+  anyint: "AnyInt",
+  zenmux: "ZenMux",
+};
+
+function formatPlatforms(sources: string[] | undefined): string {
+  if (!sources || sources.length === 0) return "—";
+  return sources.map((s) => PLATFORM_LABELS[s] ?? s).join(", ");
 }
 
 function generateRemark(events: PivotEvent[], dates: string[]): string {
@@ -64,6 +78,7 @@ export function PivotTable({
   metric,
   data,
   events,
+  platforms,
 }: PivotTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("cumulative");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -156,6 +171,11 @@ export function PivotTable({
             </th>
             <th className="text-left py-3 px-4 font-medium text-[#6B7785] w-[100px] min-w-[100px]">
               {t.table.provider}
+            </th>
+
+            {/* Platform — data source(s) */}
+            <th className="text-left py-3 px-4 font-medium text-[#6B7785] w-[120px] min-w-[120px]">
+              {t.table.platform}
             </th>
 
             {/* Cumulative — right after fixed cols */}
@@ -275,6 +295,11 @@ export function PivotTable({
                       </span>
                     );
                   })()}
+                </td>
+
+                {/* Platform — data source(s) */}
+                <td className="py-3 px-4 text-[#6B7785] whitespace-nowrap">
+                  {formatPlatforms(platforms?.[m.id])}
                 </td>
 
                 {/* Cumulative */}

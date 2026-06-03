@@ -1,11 +1,14 @@
-import { getRanking } from "@/lib/queries";
+import { getRanking, getModelPlatforms } from "@/lib/queries";
 import { CompareClient } from "./compare-client";
 import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function ComparePage() {
-  const models = await getRanking();
+  const [models, platforms] = await Promise.all([
+    getRanking(),
+    getModelPlatforms(),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">
@@ -20,7 +23,7 @@ export default async function ComparePage() {
           {t.compare.subtitle}
         </p>
       </div>
-      <CompareClient models={models} />
+      <CompareClient models={models} platforms={platforms} />
     </div>
   );
 }

@@ -15,10 +15,11 @@ import {
 } from "recharts";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendChart } from "@/components/trend-chart";
+import { PlatformBreakdown } from "@/components/platform-breakdown";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { utcHourToTimezones } from "@/lib/timezones";
-import type { Model, EventRecord, PeakValleyData, DailyUsagePoint } from "@/lib/queries";
+import type { Model, EventRecord, PeakValleyData, DailyUsagePoint, PlatformDailyToken } from "@/lib/queries";
 
 type Metric = "tokens" | "requests";
 type TimeRange = 7 | 14 | 30;
@@ -61,11 +62,13 @@ export function ModelDetailClient({
   events,
   hourlyDeltas,
   hasHourlyData,
+  platformDaily,
 }: {
   model: Model;
   events: EventRecord[];
   hourlyDeltas: PeakValleyData[];
   hasHourlyData: boolean;
+  platformDaily: PlatformDailyToken[];
 }) {
   const [metric, setMetric] = useState<Metric>("tokens");
   const [days, setDays] = useState<TimeRange>(7);
@@ -232,6 +235,13 @@ export function ModelDetailClient({
           />
         )}
       </div>
+
+      {/* Platform Distribution — only renders for models with ≥2 platforms */}
+      <PlatformBreakdown
+        platformDaily={platformDaily}
+        days={days}
+        colorHex={model.color_hex}
+      />
 
       {/* 3-Hour Distribution Bar Chart — only meaningful for sources with real
           hourly data (OpenRouter). Daily-grain models (anyint/zenmux) get a note. */}

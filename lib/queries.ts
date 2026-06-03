@@ -221,6 +221,55 @@ export async function getHourlyDeltas(
   return data ?? [];
 }
 
+// ─── Platform breakdown (Model Detail) ──────────────
+
+export interface PlatformDailyToken {
+  source: string;
+  usage_date: string;
+  tokens: number;
+}
+
+// Per-(source, day) token totals for a model over the last `days`.
+// Independent of getDailyUsage (which sums all sources into one number) — this
+// keeps sources separate so the detail page can show a platform breakdown.
+// Dedup matches the canonical key (usage_date, is_free, source): latest capture
+// per cell, then channels (is_free) summed within each source/day.
+export async function getPlatformBreakdown(
+  modelId: number,
+  days: number = 30
+): Promise<PlatformDailyToken[]> {
+  const since = new Date(Date.now() - days * 86400000)
+    .toISOString()
+    .slice(0, 10);
+
+  const { data: snaps } = await supabase
+    .from("snapshots")
+    .select("usage_date, total_tokens, captured_at, is_free, source")
+    .eq("model_id", modelId)
+    .gte("usage_date", since)
+    .order("captured_at", { ascending: false });
+
+  const seen = new Set<string>();
+  const bySourceDay = new Map<string, PlatformDailyToken>();
+  for (const s of snaps ?? []) {
+    const cellKey = `${s.usage_date}_${s.is_free}_${s.source}`;
+    if (seen.has(cellKey)) continue;
+    seen.add(cellKey);
+    const k = `${s.source}_${s.usage_date}`;
+    const cur = bySourceDay.get(k);
+    if (cur) {
+      cur.tokens += s.total_tokens;
+    } else {
+      bySourceDay.set(k, {
+        source: s.source,
+        usage_date: s.usage_date,
+        tokens: s.total_tokens,
+      });
+    }
+  }
+  return Array.from(bySourceDay.values());
+}
+
 // Whether a model has any OpenRouter snapshots — the only source with real
 // hourly/cumulative data. Used to decide if the 24h-distribution block is
 // meaningful (daily-grain anyint/zenmux models have no hourly resolution).

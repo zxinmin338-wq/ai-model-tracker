@@ -4,6 +4,7 @@ import {
   getModelEvents,
   getHourlyDeltas,
   hasHourlyData,
+  getPlatformBreakdown,
 } from "@/lib/queries";
 import { ModelDetailClient } from "./model-detail-client";
 
@@ -20,11 +21,13 @@ export default async function ModelDetailPage({
 
   if (!model) return notFound();
 
-  const [events, hourlyDeltas, hourlyAvailable] = await Promise.all([
-    getModelEvents(model.id),
-    getHourlyDeltas(model.id),
-    hasHourlyData(model.id),
-  ]);
+  const [events, hourlyDeltas, hourlyAvailable, platformDaily] =
+    await Promise.all([
+      getModelEvents(model.id),
+      getHourlyDeltas(model.id),
+      hasHourlyData(model.id),
+      getPlatformBreakdown(model.id, 30),
+    ]);
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">
@@ -33,6 +36,7 @@ export default async function ModelDetailPage({
         events={events}
         hourlyDeltas={hourlyDeltas}
         hasHourlyData={hourlyAvailable}
+        platformDaily={platformDaily}
       />
     </div>
   );

@@ -75,7 +75,13 @@ function getRecommendedSlugs(
 
 // ─── Component ─────────────────────────────────────
 
-export function CompareClient({ models }: { models: ModelWithUsage[] }) {
+export function CompareClient({
+  models,
+  platforms,
+}: {
+  models: ModelWithUsage[];
+  platforms: Record<number, string[]>;
+}) {
   const ownModels = useMemo(() => models.filter((m) => m.is_own), [models]);
   const otherModels = useMemo(() => models.filter((m) => !m.is_own), [models]);
 
@@ -470,6 +476,7 @@ export function CompareClient({ models }: { models: ModelWithUsage[] }) {
             metric={metric}
             data={pivotData}
             events={pivotEvents}
+            platforms={platforms}
           />
         </div>
       ) : (

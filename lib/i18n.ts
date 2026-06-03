@@ -35,6 +35,7 @@ export const t = {
     model: '模型',
     brand: '公司',
     provider: 'Provider',
+    platform: '平台',
     status: '状态',
     tokens7d: '近7日 Token',
     requests7d: '近7日请求数',
@@ -98,6 +99,7 @@ export const t = {
   detail: {
     backToRankings: '← 返回排行榜',
     distribution: '24 小时调用分布',
+    platformDistribution: '平台分布',
     eventTimeline: '事件时间线',
     peakValleyNoData: '峰谷分析需要更多小时级数据,请保持数据采集运行。',
     noHourlyData: '该模型为日级数据,无小时级分布(小时粒度仅 OpenRouter 平台支持)。',
