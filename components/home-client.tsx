@@ -99,7 +99,10 @@ export function HomeClient({
   );
 
   // KPI calculations
-  const trackedCount = models.length;
+  // "Tracked models" = models that actually have data (7d tokens > 0), an
+  // honest count that excludes zero-activity rows kept in the DB. Global
+  // (all/all) scope, so it doesn't flicker as table filters change.
+  const trackedCount = models.filter((m) => m.tokens_7d > 0).length;
   const newThisWeek = models.filter((m) => {
     if (!m.released_at) return false;
     const diff = Date.now() - new Date(m.released_at).getTime();
@@ -123,11 +126,14 @@ export function HomeClient({
   });
 
   // Filter
-  const filtered = decorated.filter(({ m, hasData }) => {
+  const filtered = decorated.filter(({ m, tokens }) => {
     if (brandFilter !== "all" && m.brand !== brandFilter) return false;
     if (regionFilter !== "all" && m.region !== regionFilter) return false;
-    // Platform/channel filter: only models with data on that platform/channel
-    if (filterActive && !hasData) return false;
+    // Only show models with data under the CURRENT filter scope (7d tokens > 0).
+    // Zero-activity rows stay in the DB and reappear automatically once they
+    // have data. Under a platform/channel filter, `tokens` is already re-scoped
+    // to that platform/channel, so e.g. AnyInt only keeps models with AnyInt data.
+    if (tokens <= 0) return false;
     return true;
   });
 
