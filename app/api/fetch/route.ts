@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
-import { fetchModelActivity } from "@/lib/openrouter";
+import { fetchModelActivity, discoverOpenRouterModels } from "@/lib/openrouter";
 import { fetchAnyIntActivity } from "@/lib/anyint";
 import {
   fetchZenMuxActivity,
@@ -20,6 +20,53 @@ const ANYINT_MODELS: Record<string, string> = {
   "ernie-5.1": "ernie-5.1",
 };
 
+// Competitor vendor pool — OpenRouter author slugs to auto-discover.
+const OR_COMPETITOR_AUTHORS = [
+  "deepseek",
+  "qwen",
+  "tencent",
+  "inclusionai",
+  "minimax",
+  "moonshotai",
+  "z-ai",
+  "bytedance",
+  "bytedance-seed",
+];
+
+// author slug → brand name for auto-created rows
+const BRAND_BY_AUTHOR: Record<string, string> = {
+  deepseek: "DeepSeek",
+  qwen: "Alibaba",
+  tencent: "Tencent",
+  inclusionai: "InclusionAI",
+  minimax: "MiniMax",
+  moonshotai: "Moonshot",
+  "z-ai": "Zhipu",
+  bytedance: "ByteDance",
+  "bytedance-seed": "ByteDance",
+};
+
+// Curated palette for auto-assigned colors; overflow falls back to generated
+// golden-angle HSL so a large pool never collapses to a single grey.
+const COLOR_PALETTE = [
+  "#00897B", "#7E57C2", "#F4511E", "#43A047", "#3949AB", "#00ACC1",
+  "#FB8C00", "#8D6E63", "#5E35B1", "#039BE5", "#C0CA33", "#D81B60",
+  "#6D4C41", "#1E88E5", "#7CB342", "#F06292", "#26A69A", "#AB47BC",
+  "#FF7043", "#9CCC65", "#5C6BC0", "#26C6DA", "#FFA726", "#EC407A",
+];
+
+function hslToHex(h: number, s: number, l: number): string {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * c)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
 export async function POST(request: NextRequest) {
   // Auth check
   const authHeader = request.headers.get("authorization");
@@ -32,7 +79,64 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceClient();
   const capturedAt = new Date().toISOString();
 
-  // Get all active models
+  const errors: string[] = [];
+
+  // ─── Auto-discover OpenRouter competitor models (upsert new rows) ───
+  // Independent try/catch; a discovery failure must not block collection.
+  let orDiscoveredInserted = 0;
+  const orDiscoveryByBrand: Record<string, number> = {};
+  try {
+    const discovered = await discoverOpenRouterModels(OR_COMPETITOR_AUTHORS);
+
+    const { data: existingAll } = await supabase
+      .from("models")
+      .select("permaslug, color_hex");
+    const existingSlugs = new Set(
+      (existingAll ?? []).map((m) => m.permaslug)
+    );
+    const usedColors = new Set((existingAll ?? []).map((m) => m.color_hex));
+    const freePalette = COLOR_PALETTE.filter((c) => !usedColors.has(c));
+    let paletteIdx = 0;
+    let genIdx = 0;
+    const nextColor = () => {
+      if (paletteIdx < freePalette.length) return freePalette[paletteIdx++];
+      const hue = (genIdx++ * 137.508) % 360;
+      return hslToHex(hue, 62, 52);
+    };
+
+    const newRows = [];
+    for (const d of discovered) {
+      if (existingSlugs.has(d.permaslug)) continue; // never touch existing rows
+      existingSlugs.add(d.permaslug); // dedup within this batch too
+      const brand = BRAND_BY_AUTHOR[d.author] ?? d.author;
+      newRows.push({
+        permaslug: d.permaslug,
+        display_name: d.display_name,
+        brand,
+        provider: d.provider,
+        region: "china",
+        color_hex: nextColor(),
+        is_active: true,
+        is_own: false,
+      });
+      orDiscoveryByBrand[brand] = (orDiscoveryByBrand[brand] ?? 0) + 1;
+    }
+
+    if (newRows.length > 0) {
+      const { error: insErr } = await supabase.from("models").insert(newRows);
+      if (insErr) {
+        errors.push(`or-discover-insert: ${insErr.message}`);
+      } else {
+        orDiscoveredInserted = newRows.length;
+      }
+    }
+  } catch (e) {
+    errors.push(
+      `or-discover: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+
+  // Get all active models (now includes any newly discovered competitor rows)
   const { data: models, error: modelsError } = await supabase
     .from("models")
     .select("id, permaslug, provider")
@@ -47,7 +151,6 @@ export async function POST(request: NextRequest) {
 
   let inserted = 0;
   let zenmuxInserted = 0;
-  const errors: string[] = [];
   const zenmuxModelDecisions: string[] = [];
 
   for (const model of models) {
@@ -227,6 +330,8 @@ export async function POST(request: NextRequest) {
     inserted,
     zenmux_inserted: zenmuxInserted,
     zenmux_model_decisions: zenmuxModelDecisions,
+    or_discovered_inserted: orDiscoveredInserted,
+    or_discovery_by_brand: orDiscoveryByBrand,
     models_processed: models.length,
     sources: "openrouter (free+standard) + anyint + zenmux",
     errors: errors.length > 0 ? errors : undefined,
