@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { logicalModelKey } from "@/lib/queries";
 import type { ModelWithUsage, EventRecord, RankingBreakdownRow } from "@/lib/queries";
 
 type SortKey = "tokens_7d" | "growth";
@@ -31,6 +32,16 @@ function formatPlatforms(sources: string[]): string {
 
 type PlatformFilter = "all" | "openrouter" | "anyint" | "zenmux";
 type ChannelFilter = "all" | "free" | "paid";
+
+interface LogicalModel {
+  key: string;
+  rep: ModelWithUsage; // representative underlying row (top volume)
+  modelIds: number[];
+  tokens_7d: number;
+  tokens_prev_7d: number;
+  requests_7d: number;
+  sources: Set<string>;
+}
 
 export function HomeClient({
   models,
@@ -61,57 +72,84 @@ export function HomeClient({
 
   const filterActive = platformFilter !== "all" || channelFilter !== "all";
 
-  // Displayed metrics for a model, re-scoped to the active platform/channel
-  // filter. When neither filter is active, use the precomputed cross-source/
-  // channel totals so the default view is byte-identical to before.
-  const metricsFor = (m: ModelWithUsage) => {
-    if (!filterActive) {
-      return {
-        tokens: m.tokens_7d,
-        prev: m.tokens_prev_7d,
-        requests: m.requests_7d,
-        hasData: true,
-      };
+  // ─── Merge into logical models (cross-platform + version-split de-dup) ───
+  // Display-layer only: DB rows untouched. Rows sharing a logicalModelKey become
+  // ONE ranking entry; tokens/requests are summed across the underlying rows.
+  // The detail page shows the per-platform split.
+  const logicalModels = useMemo(() => {
+    const byKey = new Map<string, LogicalModel>();
+    for (const m of models) {
+      const key = logicalModelKey(m.permaslug);
+      let g = byKey.get(key);
+      if (!g) {
+        g = {
+          key,
+          rep: m,
+          modelIds: [],
+          tokens_7d: 0,
+          tokens_prev_7d: 0,
+          requests_7d: 0,
+          sources: new Set<string>(),
+        };
+        byKey.set(key, g);
+      }
+      g.modelIds.push(m.id);
+      g.tokens_7d += m.tokens_7d;
+      g.tokens_prev_7d += m.tokens_prev_7d;
+      g.requests_7d += m.requests_7d;
+      if (m.tokens_7d > g.rep.tokens_7d) g.rep = m; // representative = top volume
+      for (const s of platforms[m.id] ?? []) g.sources.add(s);
     }
-    const rows = (breakdownByModel[m.id] ?? []).filter((r) => {
-      if (platformFilter !== "all" && r.source !== platformFilter) return false;
-      if (channelFilter === "free" && r.is_free !== true) return false;
-      if (channelFilter === "paid" && r.is_free !== false) return false;
-      return true;
-    });
+    return [...byKey.values()];
+  }, [models, platforms]);
+
+  // Does the logical model have any request-bearing source under the current
+  // filter? ZenMux exposes tokens only (no request counts) → show "—".
+  const hasRequestSource = (g: LogicalModel): boolean => {
+    if (platformFilter === "zenmux") return false;
+    if (platformFilter === "openrouter" || platformFilter === "anyint") return true;
+    return g.sources.has("openrouter") || g.sources.has("anyint");
+  };
+
+  // Displayed metrics for a logical model, re-scoped to the active filter.
+  const metricsFor = (g: LogicalModel) => {
+    if (!filterActive) {
+      return { tokens: g.tokens_7d, prev: g.tokens_prev_7d, requests: g.requests_7d };
+    }
     let tokens = 0;
     let prev = 0;
     let requests = 0;
-    for (const r of rows) {
-      tokens += r.tokens_7d;
-      prev += r.tokens_prev_7d;
-      requests += r.requests_7d;
+    for (const id of g.modelIds) {
+      for (const r of breakdownByModel[id] ?? []) {
+        if (platformFilter !== "all" && r.source !== platformFilter) continue;
+        if (channelFilter === "free" && r.is_free !== true) continue;
+        if (channelFilter === "paid" && r.is_free !== false) continue;
+        tokens += r.tokens_7d;
+        prev += r.tokens_prev_7d;
+        requests += r.requests_7d;
+      }
     }
-    // "Has data on this platform/channel" — appears in the ranking only if it
-    // actually had activity in the current window.
-    const hasData = tokens > 0 || requests > 0;
-    return { tokens, prev, requests, hasData };
+    return { tokens, prev, requests };
   };
 
   const brands = useMemo(
-    () => Array.from(new Set(models.map((m) => m.brand))).sort(),
-    [models]
+    () => Array.from(new Set(logicalModels.map((g) => g.rep.brand))).sort(),
+    [logicalModels]
   );
 
-  // KPI calculations
-  // "Tracked models" = models that actually have data (7d tokens > 0), an
-  // honest count that excludes zero-activity rows kept in the DB. Global
-  // (all/all) scope, so it doesn't flicker as table filters change.
-  const trackedCount = models.filter((m) => m.tokens_7d > 0).length;
-  const newThisWeek = models.filter((m) => {
-    if (!m.released_at) return false;
-    const diff = Date.now() - new Date(m.released_at).getTime();
-    return diff < 7 * 86400000;
+  // KPI calculations (over logical models)
+  // "Tracked models" = logical models with data (7d tokens > 0), excluding
+  // zero-activity rows kept in the DB. Global (all/all) scope.
+  const trackedCount = logicalModels.filter((g) => g.tokens_7d > 0).length;
+  const newThisWeek = logicalModels.filter((g) => {
+    const rel = g.rep.released_at;
+    if (!rel) return false;
+    return Date.now() - new Date(rel).getTime() < 7 * 86400000;
   }).length;
   const freeToPaidThisWeek = recentEvents.filter(
     (e) => e.event_type === "free_to_paid"
   ).length;
-  const totalTokens7d = models.reduce((sum, m) => sum + m.tokens_7d, 0);
+  const totalTokens7d = logicalModels.reduce((sum, g) => sum + g.tokens_7d, 0);
 
   // Growth % from a (tokens, prev) pair
   function growthPct(tokens: number, prev: number): number | null {
@@ -119,20 +157,22 @@ export function HomeClient({
     return ((tokens - prev) / prev) * 100;
   }
 
-  // Decorate each model with its (possibly re-scoped) metrics
-  const decorated = models.map((m) => {
-    const mm = metricsFor(m);
-    return { m, ...mm, growth: growthPct(mm.tokens, mm.prev) };
+  // Decorate each logical model with its (possibly re-scoped) metrics
+  const decorated = logicalModels.map((g) => {
+    const mm = metricsFor(g);
+    return {
+      g,
+      rep: g.rep,
+      ...mm,
+      growth: growthPct(mm.tokens, mm.prev),
+      showReq: hasRequestSource(g),
+    };
   });
 
-  // Filter
-  const filtered = decorated.filter(({ m, tokens }) => {
-    if (brandFilter !== "all" && m.brand !== brandFilter) return false;
-    if (regionFilter !== "all" && m.region !== regionFilter) return false;
-    // Only show models with data under the CURRENT filter scope (7d tokens > 0).
-    // Zero-activity rows stay in the DB and reappear automatically once they
-    // have data. Under a platform/channel filter, `tokens` is already re-scoped
-    // to that platform/channel, so e.g. AnyInt only keeps models with AnyInt data.
+  // Filter (brand/region on the representative row; tokens>0 under current scope)
+  const filtered = decorated.filter(({ rep, tokens }) => {
+    if (brandFilter !== "all" && rep.brand !== brandFilter) return false;
+    if (regionFilter !== "all" && rep.region !== regionFilter) return false;
     if (tokens <= 0) return false;
     return true;
   });
@@ -271,14 +311,14 @@ export function HomeClient({
               </tr>
             </thead>
             <tbody>
-              {sorted.map(({ m, tokens, requests, growth }, i) => {
+              {sorted.map(({ g, rep, tokens, requests, growth, showReq }, i) => {
                 const isNew =
-                  m.released_at &&
-                  Date.now() - new Date(m.released_at).getTime() < 7 * 86400000;
+                  rep.released_at &&
+                  Date.now() - new Date(rep.released_at).getTime() < 7 * 86400000;
 
                 return (
                   <tr
-                    key={m.id}
+                    key={g.key}
                     className="border-b border-[#E8EEF7] hover:bg-[#F0F4F8] transition-colors"
                   >
                     <td className="py-3 px-2 text-[#94A0AE] font-medium">
@@ -286,14 +326,14 @@ export function HomeClient({
                     </td>
                     <td className="py-3 px-2">
                       <Link
-                        href={`/model/${encodeURIComponent(m.permaslug)}`}
+                        href={`/model/${encodeURIComponent(rep.permaslug)}`}
                         className="flex items-center gap-2 font-medium text-[#1A2332] hover:text-[#5B8DEF] transition-colors"
                       >
                         <span
                           className="inline-block h-3 w-3 rounded-full shrink-0"
-                          style={{ backgroundColor: m.color_hex }}
+                          style={{ backgroundColor: rep.color_hex }}
                         />
-                        {m.display_name}
+                        {rep.display_name}
                         {isNew && (
                           <span className="text-xs font-medium px-1.5 py-0.5 rounded-md bg-[#E8EEF7] text-[#5B8DEF]">
                             {t.common.new}
@@ -301,10 +341,10 @@ export function HomeClient({
                         )}
                       </Link>
                     </td>
-                    <td className="py-3 px-2 text-[#6B7785]">{m.brand}</td>
+                    <td className="py-3 px-2 text-[#6B7785]">{rep.brand}</td>
                     <td className="py-3 px-2 text-[#6B7785] max-w-[180px]">
                       {(() => {
-                        const p = formatProvider(m.provider);
+                        const p = formatProvider(rep.provider);
                         return p.full ? (
                           <span title={p.full} className="cursor-default">
                             {p.short}
@@ -315,13 +355,17 @@ export function HomeClient({
                       })()}
                     </td>
                     <td className="py-3 px-2 text-[#6B7785] whitespace-nowrap">
-                      {formatPlatforms(platforms[m.id] ?? [])}
+                      {formatPlatforms([...g.sources].sort())}
                     </td>
                     <td className="py-3 px-2 text-right font-mono text-[#1A2332]">
                       {formatTokens(tokens)}
                     </td>
                     <td className="py-3 px-2 text-right font-mono text-[#1A2332]">
-                      {formatRequests(requests)}
+                      {showReq ? (
+                        formatRequests(requests)
+                      ) : (
+                        <span className="text-[#94A0AE]">—</span>
+                      )}
                     </td>
                     <td className="py-3 px-2 text-right font-mono">
                       {growth !== null ? (

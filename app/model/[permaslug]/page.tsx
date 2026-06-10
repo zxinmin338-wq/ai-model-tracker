@@ -5,6 +5,7 @@ import {
   getHourlyDeltas,
   hasHourlyData,
   getPlatformBreakdown,
+  getLogicalGroupMembers,
 } from "@/lib/queries";
 import { ModelDetailClient } from "./model-detail-client";
 
@@ -21,13 +22,26 @@ export default async function ModelDetailPage({
 
   if (!model) return notFound();
 
-  const [events, hourlyDeltas, hourlyAvailable, platformDaily] =
-    await Promise.all([
-      getModelEvents(model.id),
-      getHourlyDeltas(model.id),
-      hasHourlyData(model.id),
-      getPlatformBreakdown(model.id, 30),
-    ]);
+  // Logical model = this row + its cross-platform / version-split siblings.
+  // Aggregate the per-platform breakdown across all of them so the detail page
+  // shows each platform's share of the merged model.
+  const members = await getLogicalGroupMembers(slug);
+  const memberIds = members.length > 0 ? members.map((m) => m.id) : [model.id];
+
+  const [events, platformDailyArrays, hourlyFlags] = await Promise.all([
+    getModelEvents(model.id),
+    Promise.all(memberIds.map((id) => getPlatformBreakdown(id, 30))),
+    Promise.all(memberIds.map((id) => hasHourlyData(id))),
+  ]);
+
+  const platformDaily = platformDailyArrays.flat();
+  const hourlyAvailable = hourlyFlags.some(Boolean);
+  // Hourly data is OpenRouter-only; use the member that has it.
+  const hourlyMemberId =
+    memberIds.find((_, i) => hourlyFlags[i]) ?? model.id;
+  const hourlyDeltas = hourlyAvailable
+    ? await getHourlyDeltas(hourlyMemberId)
+    : [];
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">

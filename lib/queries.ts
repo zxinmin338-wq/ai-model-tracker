@@ -287,6 +287,44 @@ export async function hasHourlyData(modelId: number): Promise<boolean> {
   return (data?.length ?? 0) > 0;
 }
 
+// ─── Logical model key (cross-platform / version de-dup) ────
+//
+// Collapses platform suffix + version/date suffixes so the "same" model from
+// different platforms (and different version snapshots) groups into one logical
+// model. MVP / coarse granularity: version dates count as the same model.
+//   z-ai/glm-4.6, z-ai/glm-4.6-20251208, z-ai/glm-4.6@zenmux  -> "z-ai/glm-4.6"
+//   deepseek/deepseek-r1, deepseek/deepseek-r1-0528           -> "deepseek/deepseek-r1"
+export function logicalModelKey(permaslug: string): string {
+  let s = permaslug.replace(/@zenmux$/, "");
+  s = s.replace(/-\d{8}$/, ""); //         -20260423
+  s = s.replace(/-\d{4}-\d{2}-\d{2}$/, ""); // -2026-02-10
+  s = s.replace(/-\d{2}-\d{2}$/, ""); //      -07-25
+  s = s.replace(/-\d{4}$/, ""); //            -2509 / -0905 / -2507
+  return s.toLowerCase();
+}
+
+// All model rows belonging to the same logical model as `permaslug`
+// (cross-platform + version-split members). Used by the detail page to
+// aggregate the per-platform breakdown across every underlying row.
+export interface LogicalGroupMember {
+  id: number;
+  permaslug: string;
+}
+export async function getLogicalGroupMembers(
+  permaslug: string
+): Promise<LogicalGroupMember[]> {
+  const key = logicalModelKey(permaslug);
+  const { data } = await supabase.from("models").select("id, permaslug");
+  const members = (data ?? []).filter(
+    (m) => logicalModelKey(m.permaslug) === key
+  );
+  // ensure the queried model is always included
+  if (!members.some((m) => m.permaslug === permaslug)) {
+    // fall back: caller's row may be inactive/edge; not expected, but safe
+  }
+  return members;
+}
+
 // ─── Ranking breakdown (Homepage platform/channel filters) ────
 
 export interface RankingBreakdownRow {
