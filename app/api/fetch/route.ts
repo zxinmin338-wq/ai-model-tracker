@@ -33,6 +33,23 @@ const OR_COMPETITOR_AUTHORS = [
   "bytedance-seed",
 ];
 
+// ZenMux author slugs for the same 8 vendors (ZenMux uses "bytedance", not the
+// "bytedance-seed" split OpenRouter has).
+const ZENMUX_COMPETITOR_AUTHORS = [
+  "deepseek",
+  "qwen",
+  "tencent",
+  "inclusionai",
+  "minimax",
+  "moonshotai",
+  "z-ai",
+  "bytedance",
+];
+
+// Drop image/video/audio/asr/omni models by slug name (used for ZenMux, which
+// exposes no modality metadata).
+const COMPETITOR_EXCLUDE_RE = /(image|video|kling|seedance|audio|tts|asr|omni)/i;
+
 // author slug → brand name for auto-created rows
 const BRAND_BY_AUTHOR: Record<string, string> = {
   deepseek: "DeepSeek",
@@ -325,6 +342,133 @@ export async function POST(request: NextRequest) {
     errors.push(`zenmux: ${e instanceof Error ? e.message : String(e)}`);
   }
 
+  // ─── ZenMux competitor auto-discovery (8 vendor author slugs) ───
+  // Separate rows from OpenRouter (no cross-platform merge). permaslug =
+  // ZenMux model_slug; if it collides with a NON-zenmux row (e.g. an OR row),
+  // namespace as "<model_slug>@zenmux" so the platforms stay on separate rows.
+  // Idempotent: re-runs reuse the same rows.
+  let zenmuxCompModelsCreated = 0;
+  let zenmuxCompSnapshots = 0;
+  const zenmuxCompByBrand: Record<string, number> = {};
+  try {
+    const { data: allModels2 } = await supabase
+      .from("models")
+      .select("id, permaslug, color_hex");
+    const idByPermaslug = new Map<string, number>(
+      (allModels2 ?? []).map((m) => [m.permaslug, m.id])
+    );
+    const usedColors = new Set((allModels2 ?? []).map((m) => m.color_hex));
+    const freePalette = COLOR_PALETTE.filter((c) => !usedColors.has(c));
+    let pIdx = 0;
+    let gIdx = 0;
+    const nextColor = () => {
+      if (pIdx < freePalette.length) return freePalette[pIdx++];
+      const hue = (gIdx++ * 137.508) % 360;
+      return hslToHex(hue, 62, 52);
+    };
+
+    // Does an existing model row already have zenmux data? (collision tiebreak)
+    const zenmuxOwnedCache = new Map<number, boolean>();
+    const hasZenmuxData = async (modelId: number): Promise<boolean> => {
+      const cached = zenmuxOwnedCache.get(modelId);
+      if (cached !== undefined) return cached;
+      const { data } = await supabase
+        .from("snapshots")
+        .select("id")
+        .eq("model_id", modelId)
+        .eq("source", "zenmux")
+        .limit(1);
+      const has = (data?.length ?? 0) > 0;
+      zenmuxOwnedCache.set(modelId, has);
+      return has;
+    };
+
+    for (const author of ZENMUX_COMPETITOR_AUTHORS) {
+      let records: ZenMuxUsageRecord[];
+      try {
+        records = await fetchZenMuxActivity(author, 30);
+      } catch (e) {
+        errors.push(
+          `zenmux[${author}]: fetch failed: ${e instanceof Error ? e.message : String(e)}`
+        );
+        continue;
+      }
+
+      // filter out non-text models, group remaining by raw model_slug
+      const byModelSlug = new Map<string, ZenMuxUsageRecord[]>();
+      for (const r of records) {
+        if (COMPETITOR_EXCLUDE_RE.test(r.model_slug)) continue;
+        if (!byModelSlug.has(r.model_slug)) byModelSlug.set(r.model_slug, []);
+        byModelSlug.get(r.model_slug)!.push(r);
+      }
+      const brand = BRAND_BY_AUTHOR[author] ?? author;
+
+      for (const [modelSlug, recs] of byModelSlug) {
+        // Resolve permaslug: namespace only when colliding with a foreign row.
+        let permaslug = modelSlug;
+        const collidingId = idByPermaslug.get(modelSlug);
+        if (collidingId !== undefined && !(await hasZenmuxData(collidingId))) {
+          permaslug = `${modelSlug}@zenmux`;
+        }
+
+        let modelId = idByPermaslug.get(permaslug);
+        if (modelId === undefined) {
+          const nameBase = modelSlug.replace(/^[^/]+\//, "");
+          const color = nextColor();
+          const { data: created, error: createErr } = await supabase
+            .from("models")
+            .insert({
+              permaslug,
+              display_name: deriveDisplayName(nameBase),
+              brand,
+              provider: null, // ZenMux exposes no provider
+              region: "china",
+              is_active: true,
+              is_own: false,
+              color_hex: color,
+            })
+            .select("id")
+            .single();
+          if (createErr || !created) {
+            errors.push(
+              `${permaslug}[zenmux-comp]: create failed: ${createErr?.message}`
+            );
+            continue;
+          }
+          modelId = created.id as number;
+          idByPermaslug.set(permaslug, modelId);
+          zenmuxOwnedCache.set(modelId, true);
+          zenmuxCompModelsCreated++;
+          zenmuxCompByBrand[brand] = (zenmuxCompByBrand[brand] ?? 0) + 1;
+        }
+
+        const mid = modelId;
+        const rows = recs.map((r) => ({
+          model_id: mid,
+          captured_at: capturedAt,
+          usage_date: r.usage_date,
+          total_tokens: r.total_tokens,
+          total_requests: null,
+          is_free: false,
+          source: "zenmux",
+        }));
+        const { error: insErr } = await supabase
+          .from("snapshots")
+          .insert(rows);
+        if (insErr) {
+          errors.push(`${permaslug}[zenmux-comp]: ${insErr.message}`);
+        } else {
+          inserted += rows.length;
+          zenmuxCompSnapshots += rows.length;
+        }
+      }
+    }
+  } catch (e) {
+    errors.push(
+      `zenmux-comp: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+
   return Response.json({
     ok: true,
     inserted,
@@ -332,8 +476,11 @@ export async function POST(request: NextRequest) {
     zenmux_model_decisions: zenmuxModelDecisions,
     or_discovered_inserted: orDiscoveredInserted,
     or_discovery_by_brand: orDiscoveryByBrand,
+    zenmux_competitor_models_created: zenmuxCompModelsCreated,
+    zenmux_competitor_snapshots: zenmuxCompSnapshots,
+    zenmux_competitor_by_brand: zenmuxCompByBrand,
     models_processed: models.length,
-    sources: "openrouter (free+standard) + anyint + zenmux",
+    sources: "openrouter (free+standard) + anyint + zenmux + zenmux-competitors",
     errors: errors.length > 0 ? errors : undefined,
     captured_at: capturedAt,
   });
