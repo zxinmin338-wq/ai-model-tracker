@@ -51,6 +51,7 @@ export default async function ModelDetailPage({
         hourlyDeltas={hourlyDeltas}
         hasHourlyData={hourlyAvailable}
         platformDaily={platformDaily}
+        memberSlugs={memberIds.length > 0 ? members.map((m) => m.permaslug) : [model.permaslug]}
       />
     </div>
   );

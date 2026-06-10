@@ -63,12 +63,14 @@ export function ModelDetailClient({
   hourlyDeltas,
   hasHourlyData,
   platformDaily,
+  memberSlugs,
 }: {
   model: Model;
   events: EventRecord[];
   hourlyDeltas: PeakValleyData[];
   hasHourlyData: boolean;
   platformDaily: PlatformDailyToken[];
+  memberSlugs: string[];
 }) {
   const [metric, setMetric] = useState<Metric>("tokens");
   const [days, setDays] = useState<TimeRange>(7);
@@ -76,22 +78,43 @@ export function ModelDetailClient({
   const [series, setSeries] = useState<DailyUsagePoint[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Logical model = this row + cross-platform / version-split siblings.
+  const members = memberSlugs.length > 0 ? memberSlugs : [model.permaslug];
+  const memberKey = members.join(",");
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const slugs = memberKey.split(",");
       const params = new URLSearchParams();
-      params.append("slugs", model.permaslug);
+      slugs.forEach((s) => params.append("slugs", s));
       params.set("days", String(days));
       params.set("channel", channel);
       const res = await fetch(`/api/compare?${params.toString()}`);
       const json = await res.json();
-      setSeries(json.series ?? []);
+      // Collapse every member's columns into the representative model's key so
+      // the single trend line reflects the merged logical model (all platforms
+      // + versions summed).
+      const tokKey = model.permaslug;
+      const reqKey = `${model.permaslug}_requests`;
+      const merged = (json.series ?? []).map(
+        (row: Record<string, number | string>) => {
+          let tok = 0;
+          let req = 0;
+          for (const s of slugs) {
+            tok += Number(row[s] ?? 0);
+            req += Number(row[`${s}_requests`] ?? 0);
+          }
+          return { date: row.date, [tokKey]: tok, [reqKey]: req };
+        }
+      );
+      setSeries(merged);
     } catch (e) {
       console.error("Failed to fetch model data:", e);
     } finally {
       setLoading(false);
     }
-  }, [model.permaslug, days, channel]);
+  }, [model.permaslug, memberKey, days, channel]);
 
   useEffect(() => {
     fetchData();
