@@ -262,21 +262,6 @@ export function PivotTable({
                       {m.is_own && "⭐ "}
                       {m.display_name}
                     </span>
-                    {m.current_status && (
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-md shrink-0 ${
-                          m.current_status === "free"
-                            ? "bg-[#E8EEF7] text-[#5B8DEF]"
-                            : m.current_status === "paid"
-                            ? "bg-[#F0F4F8] text-[#6B7785]"
-                            : m.current_status === "transitioning"
-                            ? "bg-[#FFF3E0] text-[#F0A856]"
-                            : "bg-[#FDECEA] text-[#E85B81]"
-                        }`}
-                      >
-                        {t.status[m.current_status] ?? m.current_status}
-                      </span>
-                    )}
                   </div>
                 </td>
 

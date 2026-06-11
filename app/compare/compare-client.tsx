@@ -24,53 +24,16 @@ interface EventData {
   event_type?: string;
 }
 
-// ─── Recommendation algorithm ──────────────────────
+// ─── Platform labels ───────────────────────────────
 
-function scoreCompetitor(own: ModelWithUsage, candidate: ModelWithUsage): number {
-  let score = 0;
+const PLATFORM_LABELS: Record<string, string> = {
+  openrouter: "OpenRouter",
+  anyint: "AnyInt",
+  zenmux: "ZenMux",
+};
 
-  // 1. Same region (+3)
-  if (own.region && candidate.region && own.region === candidate.region) {
-    score += 3;
-  }
-
-  // 2. Similar volume: 0.3x - 3x of own tokens_7d (+2)
-  if (own.tokens_7d > 0 && candidate.tokens_7d > 0) {
-    const ratio = candidate.tokens_7d / own.tokens_7d;
-    if (ratio >= 0.3 && ratio <= 3) {
-      score += 2;
-    }
-  }
-
-  // 3. Same status (+1)
-  if (own.current_status && candidate.current_status &&
-      own.current_status === candidate.current_status) {
-    score += 1;
-  }
-
-  return score;
-}
-
-function getRecommendedSlugs(
-  models: ModelWithUsage[],
-  ownModels: ModelWithUsage[],
-  maxCount: number = 5
-): Set<string> {
-  if (ownModels.length === 0) return new Set();
-
-  const primaryOwn = ownModels[0]; // Use first own model as reference
-  const candidates = models.filter((m) => !m.is_own);
-
-  const scored = candidates.map((m) => ({
-    slug: m.permaslug,
-    score: scoreCompetitor(primaryOwn, m),
-    tokens: m.tokens_7d,
-  }));
-
-  // Sort by score desc, then by tokens_7d desc
-  scored.sort((a, b) => b.score - a.score || b.tokens - a.tokens);
-
-  return new Set(scored.slice(0, maxCount).map((s) => s.slug));
+function platformLabel(sources: string[]): string {
+  return sources.map((s) => PLATFORM_LABELS[s] ?? s).join(", ");
 }
 
 // ─── Component ─────────────────────────────────────
@@ -85,17 +48,10 @@ export function CompareClient({
   const ownModels = useMemo(() => models.filter((m) => m.is_own), [models]);
   const otherModels = useMemo(() => models.filter((m) => !m.is_own), [models]);
 
-  // Recommended slugs
-  const recommendedSlugs = useMemo(
-    () => getRecommendedSlugs(models, ownModels),
-    [models, ownModels]
-  );
-
-  // Default selection: own models + recommended
+  // Default selection: own models only (smart recommendation removed)
   const [selected, setSelected] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     ownModels.forEach((m) => initial.add(m.permaslug));
-    recommendedSlugs.forEach((s) => initial.add(s));
     return initial;
   });
 
@@ -106,7 +62,8 @@ export function CompareClient({
   const [series, setSeries] = useState<DailyUsagePoint[]>([]);
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
+  const [search, setSearch] = useState("");
+  const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
   const [showExportMenu, setShowExportMenu] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -244,13 +201,49 @@ export function CompareClient({
     );
   }
 
-  // Split other models into recommended vs rest
-  const recommendedModels = otherModels.filter((m) =>
-    recommendedSlugs.has(m.permaslug)
+  // Candidate pool: non-own models with data in the last 7 days
+  const candidates = useMemo(
+    () => otherModels.filter((m) => m.tokens_7d > 0),
+    [otherModels]
   );
-  const restModels = otherModels.filter(
-    (m) => !recommendedSlugs.has(m.permaslug)
-  );
+
+  // Front-end search over the already-loaded candidates (name / brand / slug)
+  const q = search.trim().toLowerCase();
+  const filteredCandidates = q
+    ? candidates.filter(
+        (m) =>
+          m.display_name.toLowerCase().includes(q) ||
+          m.brand.toLowerCase().includes(q) ||
+          m.permaslug.toLowerCase().includes(q)
+      )
+    : candidates;
+
+  // Group candidates by brand; sort within group by tokens_7d desc, groups by
+  // total tokens desc. Platform granularity preserved (no logical-model merge):
+  // glm-4.6 and glm-4.6@zenmux remain distinct options.
+  const brandGroups = (() => {
+    const map = new Map<string, ModelWithUsage[]>();
+    for (const m of filteredCandidates) {
+      if (!map.has(m.brand)) map.set(m.brand, []);
+      map.get(m.brand)!.push(m);
+    }
+    const groups = [...map.entries()].map(([brand, list]) => ({
+      brand,
+      list: [...list].sort((a, b) => b.tokens_7d - a.tokens_7d),
+      total: list.reduce((s, m) => s + m.tokens_7d, 0),
+    }));
+    groups.sort((a, b) => b.total - a.total);
+    return groups;
+  })();
+
+  const toggleBrand = (brand: string) => {
+    setExpandedBrands((prev) => {
+      const next = new Set(prev);
+      if (next.has(brand)) next.delete(brand);
+      else next.add(brand);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -296,65 +289,76 @@ export function CompareClient({
           </div>
         )}
 
-        {/* Recommended competitors */}
-        {recommendedModels.length > 0 && (
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-[#94A0AE] mb-2">
-              推荐对比（按相关性排序）
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {recommendedModels.map((m) => (
-                <ModelCheckbox
-                  key={m.permaslug}
-                  model={m}
-                  checked={selected.has(m.permaslug)}
-                  onToggle={() => toggleModel(m.permaslug)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Candidate models: search + brand groups */}
+        <div className="space-y-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索模型 / 公司…"
+            className="w-full text-sm border border-[#E8EEF7] rounded-lg px-3 py-2 bg-white text-[#1A2332] focus:outline-none focus:border-[#5B8DEF] focus:ring-1 focus:ring-[#5B8DEF]/50"
+          />
 
-        {/* Expandable: all other models */}
-        {restModels.length > 0 && (
-          <div>
-            <button
-              onClick={() => setShowAllModels((v) => !v)}
-              className="text-sm text-[#5B8DEF] hover:text-[#4A7DDF] transition-colors flex items-center gap-1"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                className={`transition-transform ${showAllModels ? "rotate-90" : ""}`}
-              >
-                <path
-                  d="M5 3L9 7L5 11"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              {showAllModels
-                ? "收起"
-                : `展开所有模型 (${restModels.length})`}
-            </button>
-            {showAllModels && (
-              <div className="flex flex-wrap gap-3 mt-3">
-                {restModels.map((m) => (
-                  <ModelCheckbox
-                    key={m.permaslug}
-                    model={m}
-                    checked={selected.has(m.permaslug)}
-                    onToggle={() => toggleModel(m.permaslug)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          {brandGroups.length === 0 ? (
+            <div className="text-sm text-[#94A0AE] py-2">无匹配模型</div>
+          ) : (
+            <div className="space-y-2">
+              {brandGroups.map(({ brand, list }) => {
+                const isExpanded = q !== "" || expandedBrands.has(brand);
+                const selectedCount = list.filter((m) =>
+                  selected.has(m.permaslug)
+                ).length;
+                return (
+                  <div
+                    key={brand}
+                    className="border border-[#E8EEF7] rounded-lg overflow-hidden"
+                  >
+                    <button
+                      onClick={() => toggleBrand(brand)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#F0F4F8] transition-colors"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        className={`transition-transform shrink-0 ${isExpanded ? "rotate-90" : ""}`}
+                      >
+                        <path
+                          d="M5 3L9 7L5 11"
+                          stroke="#6B7785"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span className="text-sm font-medium text-[#1A2332]">
+                        {brand}
+                      </span>
+                      <span className="text-xs text-[#94A0AE]">
+                        {list.length}
+                        {selectedCount > 0 ? ` · 已选 ${selectedCount}` : ""}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="flex flex-wrap gap-3 px-3 pb-3 pt-1">
+                        {list.map((m) => (
+                          <ModelCheckbox
+                            key={m.permaslug}
+                            model={m}
+                            sources={platforms[m.id] ?? []}
+                            checked={selected.has(m.permaslug)}
+                            onToggle={() => toggleModel(m.permaslug)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ─── Controls ─── */}
@@ -544,10 +548,12 @@ export function CompareClient({
 
 function ModelCheckbox({
   model,
+  sources,
   checked,
   onToggle,
 }: {
   model: ModelWithUsage;
+  sources: string[];
   checked: boolean;
   onToggle: () => void;
 }) {
@@ -559,6 +565,11 @@ function ModelCheckbox({
         style={{ backgroundColor: model.color_hex }}
       />
       <span className="text-sm text-[#1A2332]">{model.display_name}</span>
+      {sources.length > 0 && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#F0F4F8] text-[#6B7785] shrink-0">
+          {platformLabel(sources)}
+        </span>
+      )}
       <span className="text-xs text-[#94A0AE]">
         {formatTokens(model.tokens_7d)}
       </span>
