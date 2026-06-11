@@ -6,10 +6,12 @@
  * Dates in the response are UTC.
  */
 
+// OpenRouter versioned its frontend API: the old /api/frontend/* paths now 404.
 const BASE_URL =
-  "https://openrouter.ai/api/frontend/stats/model-activity";
+  "https://openrouter.ai/api/frontend/v1/stats/model-activity";
 
-const FRONTEND_MODELS_URL = "https://openrouter.ai/api/frontend/models";
+const FRONTEND_MODELS_URL =
+  "https://openrouter.ai/api/frontend/v1/catalog/models";
 
 interface RawRecord {
   date: string;

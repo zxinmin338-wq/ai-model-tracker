@@ -33,6 +33,13 @@ const OR_COMPETITOR_AUTHORS = [
   "bytedance-seed",
 ];
 
+// Our own (first-party) OpenRouter authors — discovered the same way but tagged
+// is_own=true (e.g. Baidu's ERNIE 4.5 family).
+const OR_OWN_AUTHORS = ["baidu"];
+
+// All authors to discover on OpenRouter (competitors + own).
+const OR_DISCOVERY_AUTHORS = [...OR_COMPETITOR_AUTHORS, ...OR_OWN_AUTHORS];
+
 // ZenMux author slugs for the same 8 vendors (ZenMux uses "bytedance", not the
 // "bytedance-seed" split OpenRouter has).
 const ZENMUX_COMPETITOR_AUTHORS = [
@@ -61,6 +68,7 @@ const BRAND_BY_AUTHOR: Record<string, string> = {
   "z-ai": "Zhipu",
   bytedance: "ByteDance",
   "bytedance-seed": "ByteDance",
+  baidu: "Baidu",
 };
 
 // Curated palette for auto-assigned colors; overflow falls back to generated
@@ -103,7 +111,7 @@ export async function POST(request: NextRequest) {
   let orDiscoveredInserted = 0;
   const orDiscoveryByBrand: Record<string, number> = {};
   try {
-    const discovered = await discoverOpenRouterModels(OR_COMPETITOR_AUTHORS);
+    const discovered = await discoverOpenRouterModels(OR_DISCOVERY_AUTHORS);
 
     const { data: existingAll } = await supabase
       .from("models")
@@ -126,15 +134,17 @@ export async function POST(request: NextRequest) {
       if (existingSlugs.has(d.permaslug)) continue; // never touch existing rows
       existingSlugs.add(d.permaslug); // dedup within this batch too
       const brand = BRAND_BY_AUTHOR[d.author] ?? d.author;
+      const isOwn = OR_OWN_AUTHORS.includes(d.author);
       newRows.push({
         permaslug: d.permaslug,
         display_name: d.display_name,
         brand,
-        provider: d.provider,
+        // Own (Baidu) models live on Qianfan; competitors keep OR's provider.
+        provider: isOwn ? "Qianfan" : d.provider,
         region: "china",
         color_hex: nextColor(),
         is_active: true,
-        is_own: false,
+        is_own: isOwn,
       });
       orDiscoveryByBrand[brand] = (orDiscoveryByBrand[brand] ?? 0) + 1;
     }
