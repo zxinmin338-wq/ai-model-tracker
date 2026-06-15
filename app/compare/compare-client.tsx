@@ -65,6 +65,11 @@ export function CompareClient({
   const [search, setSearch] = useState("");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
   const [showExportMenu, setShowExportMenu] = useState(false);
+  // AI analysis
+  const [analysisContent, setAnalysisContent] = useState<string | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisDate, setAnalysisDate] = useState<string>("");
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Fetch data
@@ -96,6 +101,34 @@ export function CompareClient({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Generate AI analysis for the currently selected models
+  const generateAnalysis = useCallback(async () => {
+    const slugs = Array.from(selected);
+    if (slugs.length === 0) return;
+    setAnalysisLoading(true);
+    setAnalysisError(null);
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permaslugs: slugs }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        setAnalysisContent(null);
+        setAnalysisError(json.error || `生成失败 (HTTP ${res.status})`);
+      } else {
+        setAnalysisContent(json.content ?? "");
+        setAnalysisDate((json.created_at || new Date().toISOString()).slice(0, 10));
+      }
+    } catch {
+      setAnalysisContent(null);
+      setAnalysisError("生成失败，请重试");
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }, [selected]);
 
   // Toggle non-own models only
   const toggleModel = (slug: string) => {
@@ -448,6 +481,51 @@ export function CompareClient({
         </div>
       </div>
 
+      {/* ─── AI Analysis ─── */}
+      {selectedModels.length > 0 && (
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+                AI Analysis
+              </div>
+              <h3 className="text-lg font-semibold text-[#1A2332] mt-1">
+                AI 身位分析
+              </h3>
+            </div>
+            <button
+              onClick={generateAnalysis}
+              disabled={analysisLoading}
+              className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[#5B8DEF] text-white hover:bg-[#4A7DDF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {analysisLoading ? "分析生成中…" : "生成 AI 分析"}
+            </button>
+          </div>
+
+          {analysisLoading && (
+            <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
+              <span className="inline-block h-4 w-4 rounded-full border-2 border-[#E8EEF7] border-t-[#5B8DEF] animate-spin" />
+              分析生成中
+            </div>
+          )}
+
+          {analysisError && !analysisLoading && (
+            <div className="text-sm text-[#E85B81] mt-4">{analysisError}</div>
+          )}
+
+          {analysisContent && !analysisLoading && (
+            <div className="mt-4">
+              <div className="space-y-1.5 text-sm text-[#1A2332] leading-relaxed">
+                {renderAnalysis(analysisContent)}
+              </div>
+              <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[#E8EEF7]">
+                本判断由 AI 基于截至 {analysisDate} 数据生成，可能有误，请结合原始数据核对。
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ─── Content area ─── */}
       <div ref={contentRef}>
       {loading ? (
@@ -609,4 +687,25 @@ function ExportMenuItem({
       {label}
     </button>
   );
+}
+
+// Light renderer for the LLM analysis: preserves line breaks and **bold**.
+function renderAnalysis(text: string) {
+  return text.split("\n").map((line, i) => {
+    if (line.trim() === "") return <div key={i} className="h-1.5" />;
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <p key={i}>
+        {parts.map((p, j) =>
+          p.startsWith("**") && p.endsWith("**") ? (
+            <strong key={j} className="font-semibold">
+              {p.slice(2, -2)}
+            </strong>
+          ) : (
+            <span key={j}>{p}</span>
+          )
+        )}
+      </p>
+    );
+  });
 }
