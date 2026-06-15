@@ -444,19 +444,35 @@ export async function getTransitionCurves(): Promise<TransitionCurve[]> {
       .toISOString()
       .slice(0, 10);
 
-    // Get snapshots in range (both channels)
-    const { data: snapshots } = await supabase
-      .from("snapshots")
-      .select("usage_date, total_tokens, captured_at, is_free, source")
-      .eq("model_id", model.id)
-      .gte("usage_date", rangeStart)
-      .lte("usage_date", rangeEnd)
-      .order("captured_at", { ascending: false });
+    // Get snapshots in range (both channels). Paginate past the PostgREST
+    // 1000-row cap — otherwise, ordered by captured_at desc, the OLDEST dates in
+    // the window (including D-1 for older transitions) get truncated, the D-1
+    // baseline reads 0, and the whole curve gets dropped.
+    const snapshots: Array<{
+      usage_date: string;
+      total_tokens: number;
+      is_free: boolean;
+      source: string;
+    }> = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: page } = await supabase
+        .from("snapshots")
+        .select("usage_date, total_tokens, captured_at, is_free, source")
+        .eq("model_id", model.id)
+        .gte("usage_date", rangeStart)
+        .lte("usage_date", rangeEnd)
+        .order("captured_at", { ascending: false })
+        .range(from, from + 999);
+      if (!page || page.length === 0) break;
+      snapshots.push(...page);
+      if (page.length < 1000) break;
+    }
 
-    // Deduplicate per (date, is_free, source), then sum per date
+    // Deduplicate per (date, is_free, source), then sum per date.
+    // Ordered by captured_at desc across all pages → first seen = latest capture.
     const seen = new Set<string>();
     const byDate = new Map<string, number>();
-    for (const s of snapshots ?? []) {
+    for (const s of snapshots) {
       const dedupKey = `${s.usage_date}_${s.is_free}_${s.source}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
