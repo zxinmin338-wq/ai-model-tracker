@@ -19,42 +19,50 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 const platformLabel = (s: string) => PLATFORM_LABELS[s] ?? s;
 
-// ─── Prompt (Section 11, per-platform vs full-DB pool) ─
+// ─── Prompt (neutral: 对比模型 subject [vs 参照模型 reference]) ─
 
-function buildPrompt(ownModelName: string, structured: unknown): string {
-  return `你是 AI 模型市场分析助手。基于以下数据，回答这 3 个问题（简体中文，280字内）：
+function buildPrompt(
+  subjectName: string,
+  referenceName: string | null,
+  structured: unknown
+): string {
+  const hasRef = !!referenceName;
+  const sec4 = hasRef
+    ? `\n4. 正面对比：在 ${subjectName} 与参照模型 (${referenceName}) 都有数据的平台上，分别谁的 tokens 更高、高多少倍或百分比？周环比谁涨得更快？只描述谁高谁低与差距，不下任何判断或建议。`
+    : "";
+  return `你是 AI 模型市场分析助手。基于以下数据，回答这 ${hasRef ? 4 : 3} 个问题（简体中文，300字内）：
 [输入数据：${JSON.stringify(structured, null, 2)}]
-1. 绝对水平：我方模型 (${ownModelName}) 近7天各平台 tokens 分别多少？合计多少？量级极低的平台标注"(量级极低)"。
-2. 相对身位（分平台、对比该平台全库模型）：我方模型在它有效运营的每个平台上，于该平台全部模型中排第几？跟哪些模型同档（差距<20%）？距该平台头部差几个数量级？数据量不足的平台直接说"该平台数据量不足，不评估身位"，不要硬排。
-3. 趋势判断：基于有效平台数据，我方模型在各有效平台是上升/平稳/下降？周环比增长率(近7天 vs 前7天, wow_growth_pct)分别是多少？trivial 平台不计趋势。
+1. 绝对水平：对比模型 (${subjectName}) 近7天各平台 tokens 分别多少？合计多少？量级极低的平台标注"(量级极低)"。
+2. 相对身位（分平台、对比该平台全库模型）：对比模型在它有效运营的每个平台上，于该平台全部模型中排第几？跟哪些模型同档（差距<20%）？距该平台头部差几个数量级？数据量不足的平台直接说"该平台数据量不足，不评估身位"。
+3. 周环比趋势：基于有效平台数据，对比模型在各有效平台是上升/平稳/下降？周环比增长率(近7天 vs 前7天, wow_growth_pct)分别多少？trivial 平台不计趋势。${sec4}
 严格规则：
 - 不编数据，数字全部取自输入
 - 身位只在同平台内比较，绝不跨平台比量
 - 数据量不足的平台不下身位/趋势结论，明确说明原因（不静默丢弃）
-- 不做任何决策建议，只描述身位
+- 不做任何决策建议，只描述身位与对比
 - 不用"水平/表现/情况"等泛化词
-- 严格输出 3 个 numbered sections`;
+- 严格输出 ${hasRef ? 4 : 3} 个 numbered sections`;
 }
 
 export async function POST(request: NextRequest) {
-  let body: { permaslugs?: string[]; slugs?: string[] };
+  let body: { subject?: string; reference?: string };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const permaslugs = (body.permaslugs ?? body.slugs ?? []).filter(
-    (s): s is string => typeof s === "string" && s.length > 0
-  );
-  if (permaslugs.length === 0) {
-    return Response.json({ error: "permaslugs required" }, { status: 400 });
+  const subject =
+    typeof body.subject === "string" && body.subject ? body.subject : null;
+  const reference =
+    typeof body.reference === "string" && body.reference ? body.reference : null;
+  if (!subject) {
+    return Response.json({ error: "subject (permaslug) required" }, { status: 400 });
   }
 
   const supabase = getServiceClient();
-  const sorted = [...permaslugs].sort();
   const today = new Date().toISOString().slice(0, 10);
   const cacheKey = createHash("sha256")
-    .update(`compare|${sorted.join(",")}|${today}`)
+    .update(`compare|${subject}|${reference ?? "none"}|${today}`)
     .digest("hex");
 
   const { data: cachedRow } = await supabase
@@ -76,7 +84,6 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "DEEPSEEK_API_KEY is not set" }, { status: 500 });
   }
 
-  // ranking (id/name/is_own) + full-DB per-(model,source) 7d breakdown
   let ranking, breakdown;
   try {
     [ranking, breakdown] = await Promise.all([getRanking(), getRankingBreakdown()]);
@@ -90,12 +97,11 @@ export async function POST(request: NextRequest) {
   const bySlug = new Map(ranking.map((r) => [r.permaslug, r]));
   const idToName = new Map(ranking.map((r) => [r.id, r.display_name]));
 
-  // ── Full-DB ranked pool per platform (ALL models with data on that source) ──
+  // ── Full-DB ranked pool per platform + per-(model,source) 7d/prev tokens ──
   const fullPools = new Map<
     string,
     Array<{ id: number; name: string; tokens_7d: number; rank: number }>
   >();
-  // per (model_id|source): 7d + prev-7d tokens (for week-over-week growth)
   const msBreakdown = new Map<string, { t7: number; tprev: number }>();
   {
     const bySource = new Map<string, Map<number, number>>();
@@ -119,11 +125,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Per own-model, per-platform daily detail (active days + trivial + growth) ──
   const since7 = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
-  async function ownModelPlatformDaily(modelId: number) {
-    // paginate past the 1000-row cap
+  // per-(source) date→tokens for one model (paginate past the 1000-row cap)
+  async function dailyBySource(modelId: number) {
     const rows: Array<{ usage_date: string; total_tokens: number; is_free: boolean; source: string }> = [];
     for (let from = 0; ; from += 1000) {
       const { data: page } = await supabase
@@ -137,9 +142,8 @@ export async function POST(request: NextRequest) {
       rows.push(...page);
       if (page.length < 1000) break;
     }
-    // dedup latest per (usage_date, is_free, source) → per-source date→tokens
     const seen = new Set<string>();
-    const perSource = new Map<string, Map<string, number>>(); // source -> (date -> tokens)
+    const perSource = new Map<string, Map<string, number>>();
     for (const r of rows) {
       const k = `${r.usage_date}_${r.is_free}_${r.source}`;
       if (seen.has(k)) continue;
@@ -151,22 +155,30 @@ export async function POST(request: NextRequest) {
     return perSource;
   }
 
-  const ownSlugs = sorted.filter((s) => bySlug.get(s)?.is_own);
-  const ourModels = [];
-  for (const slug of ownSlugs) {
-    const r = bySlug.get(slug)!;
-    const perSource = await ownModelPlatformDaily(r.id);
+  interface PlatformStanding {
+    platform: string;
+    tokens_7d: number;
+    active_days: number;
+    trivial: boolean;
+    note?: string;
+    rank_in_platform_fulldb?: number | null;
+    platform_pool_size_fulldb?: number;
+    platform_head?: { name: string; tokens_7d: number } | null;
+    same_tier?: Array<{ name: string; tokens_7d: number }>;
+    wow_growth_pct?: number | null;
+  }
 
-    const platforms = [];
-    let totalTokens = 0;
-
+  async function modelStanding(permaslug: string) {
+    const row = bySlug.get(permaslug);
+    if (!row) return { found: false as const, permaslug };
+    const perSource = await dailyBySource(row.id);
+    const platforms: PlatformStanding[] = [];
+    let total = 0;
     for (const [src, dateMap] of perSource) {
       const tokens_7d = [...dateMap.values()].reduce((a, b) => a + b, 0);
       const active_days = [...dateMap.values()].filter((v) => v > 0).length;
-      totalTokens += tokens_7d;
-      const trivial = active_days < TRIVIAL_MIN_ACTIVE_DAYS;
-
-      if (trivial) {
+      total += tokens_7d;
+      if (active_days < TRIVIAL_MIN_ACTIVE_DAYS) {
         platforms.push({
           platform: platformLabel(src),
           tokens_7d,
@@ -176,28 +188,21 @@ export async function POST(request: NextRequest) {
         });
         continue;
       }
-
-      // rank against the FULL-DB pool on this platform
       const pool = fullPools.get(src) ?? [];
-      const self = pool.find((p) => p.id === r.id);
+      const self = pool.find((p) => p.id === row.id);
       const head = pool[0];
-      const sameTier = pool
+      const same_tier = pool
         .filter(
           (p) =>
-            p.id !== r.id &&
+            p.id !== row.id &&
             tokens_7d > 0 &&
             Math.abs(p.tokens_7d - tokens_7d) / tokens_7d < SAME_TIER_PCT
         )
         .slice(0, 5)
         .map((p) => ({ name: p.name, tokens_7d: p.tokens_7d }));
-
-      // Week-over-week growth (近7天 vs 前7天) — stable, unlike avg daily %change.
-      const bd = msBreakdown.get(`${r.id}|${src}`);
+      const bd = msBreakdown.get(`${row.id}|${src}`);
       const wow_growth_pct =
-        bd && bd.tprev > 0
-          ? Number((((bd.t7 - bd.tprev) / bd.tprev) * 100).toFixed(1))
-          : null;
-
+        bd && bd.tprev > 0 ? Number((((bd.t7 - bd.tprev) / bd.tprev) * 100).toFixed(1)) : null;
       platforms.push({
         platform: platformLabel(src),
         tokens_7d,
@@ -206,42 +211,74 @@ export async function POST(request: NextRequest) {
         rank_in_platform_fulldb: self?.rank ?? null,
         platform_pool_size_fulldb: pool.length,
         platform_head: head ? { name: head.name, tokens_7d: head.tokens_7d } : null,
-        same_tier: sameTier,
+        same_tier,
         wow_growth_pct,
-        wow_note:
-          wow_growth_pct === null ? "前7天无数据，周环比不可计算" : undefined,
       });
     }
+    return { found: true as const, name: row.display_name, total_tokens_7d: total, platforms };
+  }
 
-    ourModels.push({
-      name: r.display_name,
-      total_tokens_7d: totalTokens,
-      platforms,
-    });
+  const subjectData = await modelStanding(subject);
+  if (!subjectData.found) {
+    return Response.json({ error: `subject not found: ${subject}` }, { status: 404 });
+  }
+  const referenceData = reference ? await modelStanding(reference) : null;
+  const referenceName =
+    referenceData && referenceData.found ? referenceData.name : null;
+
+  // ── Head-to-head on platforms where BOTH have non-trivial data ──
+  const head_to_head: Array<{
+    platform: string;
+    subject_tokens_7d: number;
+    reference_tokens_7d: number;
+    subject_higher: boolean;
+    ratio_subject_over_reference: number | null;
+    subject_wow_pct: number | null | undefined;
+    reference_wow_pct: number | null | undefined;
+  }> = [];
+  if (referenceData && referenceData.found) {
+    const refByPlat = new Map(
+      referenceData.platforms.filter((p) => !p.trivial).map((p) => [p.platform, p])
+    );
+    for (const p of subjectData.platforms.filter((p) => !p.trivial)) {
+      const r = refByPlat.get(p.platform);
+      if (!r) continue;
+      head_to_head.push({
+        platform: p.platform,
+        subject_tokens_7d: p.tokens_7d,
+        reference_tokens_7d: r.tokens_7d,
+        subject_higher: p.tokens_7d >= r.tokens_7d,
+        ratio_subject_over_reference:
+          r.tokens_7d > 0 ? Number((p.tokens_7d / r.tokens_7d).toFixed(3)) : null,
+        subject_wow_pct: p.wow_growth_pct,
+        reference_wow_pct: r.wow_growth_pct,
+      });
+    }
   }
 
   const structured = {
     metric:
       "近7天 tokens(prompt+completion); 身位=对比该平台【全库】所有有数据模型; 仅同平台内比较; trivial平台(有量天数<3)不评估身位/趋势",
-    our_models: ourModels,
+    subject: { name: subjectData.name, total_tokens_7d: subjectData.total_tokens_7d, platforms: subjectData.platforms },
+    reference:
+      referenceData && referenceData.found
+        ? { name: referenceData.name, total_tokens_7d: referenceData.total_tokens_7d, platforms: referenceData.platforms }
+        : null,
+    head_to_head: referenceData && referenceData.found ? head_to_head : undefined,
   };
-
-  const ownNames = ourModels.map((m) => m.name);
-  const ownModelName = ownNames.length > 0 ? ownNames.join("、") : "(无我方模型)";
 
   // ─── Call DeepSeek ───
   let content: string;
   try {
     const res = await fetch(DEEPSEEK_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: DEEPSEEK_MODEL,
         max_tokens: MAX_TOKENS,
-        messages: [{ role: "user", content: buildPrompt(ownModelName, structured) }],
+        messages: [
+          { role: "user", content: buildPrompt(subjectData.name, referenceName, structured) },
+        ],
       }),
       signal: AbortSignal.timeout(90_000),
     });
