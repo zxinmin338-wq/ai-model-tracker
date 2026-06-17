@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
     subject_tokens_7d: number;
     reference_tokens_7d: number;
     subject_higher: boolean;
-    ratio_subject_over_reference: number | null;
+    higher_over_lower_times: number | null;
     subject_wow_pct: number | null | undefined;
     reference_wow_pct: number | null | undefined;
   }> = [];
@@ -243,13 +243,15 @@ export async function POST(request: NextRequest) {
     for (const p of subjectData.platforms.filter((p) => !p.trivial)) {
       const r = refByPlat.get(p.platform);
       if (!r) continue;
+      const hi = Math.max(p.tokens_7d, r.tokens_7d);
+      const lo = Math.min(p.tokens_7d, r.tokens_7d);
       head_to_head.push({
         platform: p.platform,
         subject_tokens_7d: p.tokens_7d,
         reference_tokens_7d: r.tokens_7d,
         subject_higher: p.tokens_7d >= r.tokens_7d,
-        ratio_subject_over_reference:
-          r.tokens_7d > 0 ? Number((p.tokens_7d / r.tokens_7d).toFixed(3)) : null,
+        // 高者是低者的几倍（始终 ≥1，不会因极差被舍成 0）
+        higher_over_lower_times: lo > 0 ? Number((hi / lo).toFixed(1)) : null,
         subject_wow_pct: p.wow_growth_pct,
         reference_wow_pct: r.wow_growth_pct,
       });
