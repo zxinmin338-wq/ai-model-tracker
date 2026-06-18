@@ -222,6 +222,14 @@ export function CompareClient({
         </div>
       </div>
 
+      {/* ─── 趋势可视化 ─── */}
+      <div>
+        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+          Trends
+        </div>
+        <h2 className="text-lg font-semibold text-[#1A2332] mt-1">趋势可视化</h2>
+      </div>
+
       {/* ─── Controls ─── */}
       <div className="flex items-center gap-5 flex-wrap">
         <ControlGroup label="视图">
@@ -287,48 +295,7 @@ export function CompareClient({
         </div>
       </div>
 
-      {/* ─── AI Analysis ─── */}
-      {subjectModel && (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
-                AI Analysis
-              </div>
-              <h3 className="text-lg font-semibold text-[#1A2332] mt-1">AI 身位分析</h3>
-            </div>
-            <button
-              onClick={generateAnalysis}
-              disabled={analysisLoading}
-              className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[#5B8DEF] text-white hover:bg-[#4A7DDF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            >
-              {analysisLoading ? "分析生成中…" : "生成 AI 分析"}
-            </button>
-          </div>
-
-          {analysisLoading && (
-            <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
-              <span className="inline-block h-4 w-4 rounded-full border-2 border-[#E8EEF7] border-t-[#5B8DEF] animate-spin" />
-              分析生成中
-            </div>
-          )}
-          {analysisError && !analysisLoading && (
-            <div className="text-sm text-[#E85B81] mt-4">{analysisError}</div>
-          )}
-          {analysisContent && !analysisLoading && (
-            <div className="mt-4">
-              <div className="space-y-1.5 text-sm text-[#1A2332] leading-relaxed">
-                {renderAnalysis(analysisContent)}
-              </div>
-              <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[#E8EEF7]">
-                本判断由 AI 基于截至 {analysisDate} 数据生成，可能有误，请结合原始数据核对。
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ─── Content area ─── */}
+      {/* ─── Content area (趋势可视化) ─── */}
       <div ref={contentRef}>
         {loading ? (
           <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
@@ -401,6 +368,47 @@ export function CompareClient({
           </>
         )}
       </div>
+
+      {/* ─── AI 身位分析 ─── */}
+      {subjectModel && (
+        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+                AI Analysis
+              </div>
+              <h2 className="text-lg font-semibold text-[#1A2332] mt-1">AI 身位分析</h2>
+            </div>
+            <button
+              onClick={generateAnalysis}
+              disabled={analysisLoading}
+              className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[#5B8DEF] text-white hover:bg-[#4A7DDF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {analysisLoading ? "分析生成中…" : "生成 AI 分析"}
+            </button>
+          </div>
+
+          {analysisLoading && (
+            <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
+              <span className="inline-block h-4 w-4 rounded-full border-2 border-[#E8EEF7] border-t-[#5B8DEF] animate-spin" />
+              分析生成中
+            </div>
+          )}
+          {analysisError && !analysisLoading && (
+            <div className="text-sm text-[#E85B81] mt-4">{analysisError}</div>
+          )}
+          {analysisContent && !analysisLoading && (
+            <div className="mt-4">
+              <div className="space-y-1.5 text-sm text-[#1A2332] leading-relaxed">
+                {renderAnalysis(analysisContent)}
+              </div>
+              <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[#E8EEF7]">
+                本判断由 AI 基于截至 {analysisDate} 数据生成，可能有误，请结合原始数据核对。
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

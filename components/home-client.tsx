@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { logicalModelKey } from "@/lib/queries";
-import type { ModelWithUsage, EventRecord, RankingBreakdownRow } from "@/lib/queries";
+import type { ModelWithUsage, RankingBreakdownRow } from "@/lib/queries";
 
 type SortKey = "tokens_7d" | "growth";
 type SortDir = "asc" | "desc";
@@ -45,12 +45,10 @@ interface LogicalModel {
 
 export function HomeClient({
   models,
-  recentEvents,
   platforms,
   breakdown,
 }: {
   models: ModelWithUsage[];
-  recentEvents: EventRecord[];
   platforms: Record<number, string[]>;
   breakdown: RankingBreakdownRow[];
 }) {
@@ -141,15 +139,6 @@ export function HomeClient({
   // "Tracked models" = logical models with data (7d tokens > 0), excluding
   // zero-activity rows kept in the DB. Global (all/all) scope.
   const trackedCount = logicalModels.filter((g) => g.tokens_7d > 0).length;
-  const newThisWeek = logicalModels.filter((g) => {
-    const rel = g.rep.released_at;
-    if (!rel) return false;
-    return Date.now() - new Date(rel).getTime() < 7 * 86400000;
-  }).length;
-  const freeToPaidThisWeek = recentEvents.filter(
-    (e) => e.event_type === "free_to_paid"
-  ).length;
-  const totalTokens7d = logicalModels.reduce((sum, g) => sum + g.tokens_7d, 0);
 
   // Growth % from a (tokens, prev) pair
   function growthPct(tokens: number, prev: number): number | null {
@@ -217,9 +206,6 @@ export function HomeClient({
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
         <KPICard label={t.kpi.trackedModels} value={String(trackedCount)} />
-        <KPICard label={t.kpi.newFreeThisWeek} value={String(newThisWeek)} />
-        <KPICard label={t.kpi.freeToPaidThisWeek} value={String(freeToPaidThisWeek)} />
-        <KPICard label={t.kpi.total7dTokens} value={formatTokens(totalTokens7d)} />
       </div>
 
       {/* Model Rankings */}
@@ -399,39 +385,6 @@ export function HomeClient({
         </div>
       </div>
 
-      {/* This Week's Events */}
-      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 mb-6">
-        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
-          Events
-        </div>
-        <h2 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
-          {t.home.thisWeekEvents}
-        </h2>
-        {recentEvents.length > 0 ? (
-          <div className="space-y-3">
-            {recentEvents.map((evt) => (
-              <div key={evt.id} className="flex items-start gap-3">
-                <div className="mt-1.5 h-2 w-2 rounded-full bg-[#5B8DEF] shrink-0" />
-                <div>
-                  <span className="text-sm text-[#94A0AE] mr-2">
-                    {evt.event_date}
-                  </span>
-                  <span className="text-sm font-medium text-[#1A2332]">
-                    {evt.label}
-                  </span>
-                  {evt.display_name && (
-                    <span className="text-sm text-[#6B7785] ml-1">
-                      ({evt.brand})
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-[#94A0AE]">{t.home.noEvents}</p>
-        )}
-      </div>
     </div>
   );
 }

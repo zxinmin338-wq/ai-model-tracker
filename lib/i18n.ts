@@ -2,7 +2,7 @@ export const t = {
   // 导航
   nav: {
     home: '首页',
-    compare: '趋势对比',
+    compare: '模型对比',
   },
   // 状态
   status: {
@@ -73,7 +73,7 @@ export const t = {
   // 首页
   home: {
     title: 'AI Model Tracker',
-    subtitle: '免费模型生命周期监控',
+    subtitle: '跨平台 AI 模型调用量追踪',
     rankings: '模型排行榜',
     thisWeekEvents: '本周事件',
     noEvents: '本周暂无事件记录',
