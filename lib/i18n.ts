@@ -3,9 +3,6 @@ export const t = {
   nav: {
     home: '首页',
     compare: '趋势对比',
-    transitions: '转付费分析',
-    events: '事件管理',
-    settings: '设置',
   },
   // 状态
   status: {
@@ -86,15 +83,6 @@ export const t = {
     subtitle: '选择 2-5 个模型叠加对比',
     totalInRange: '所选周期累计',
   },
-  // 转付费分析页
-  transitions: {
-    subtitle: '归一化到 D-1 = 100%,按转付费日期 D+0 对齐',
-    historyCases: '历史转付费案例',
-    noData: '暂无 free→paid 转付费事件记录',
-    transition: '转付费',
-    baseline: '基准线',
-    relatedEvents: '相关事件',
-  },
   // 详情页
   detail: {
     backToRankings: '← 返回排行榜',
@@ -138,15 +126,5 @@ export const t = {
     usEast: '美东',
     usWest: '美西',
     centralEurope: '中欧',
-  },
-  // 设置页
-  settings: {
-    title: '设置',
-    subtitle: '标记我方模型,对比页将以我方模型为中心展示',
-    myModels: '我方模型',
-    allModels: '全部模型',
-    noOwnModels: '尚未标记我方模型。在下方列表中勾选即可。',
-    setProvider: '设置 Provider',
-    save: '保存',
   },
 };
