@@ -524,7 +524,7 @@ function ModelSearchSelect({
                       </span>
                     ) : null}
                     <span className="text-xs text-[#94A0AE] shrink-0">
-                      {formatTokens(m.tokens_7d)}
+                      {m.tokens_7d > 0 ? formatTokens(m.tokens_7d) : "—"}
                     </span>
                   </button>
                 ))

@@ -352,30 +352,38 @@ export async function getRankingBreakdown(): Promise<RankingBreakdownRow[]> {
 // ─── Model platforms (distinct sources per model) ────
 
 export async function getModelPlatforms(): Promise<Record<number, string[]>> {
-  // Query only active models and their distinct sources
+  const result: Record<number, string[]> = {};
+
+  // Fast path: a single RPC returning DISTINCT (model_id, source).
+  // Requires the get_model_platforms() function (docs/batch6-model-platforms.sql).
+  const { data, error } = await supabase.rpc("get_model_platforms");
+  if (!error && data) {
+    for (const row of data as Array<{ model_id: number; source: string }>) {
+      (result[row.model_id] ??= []).push(row.source);
+    }
+    for (const k of Object.keys(result)) result[Number(k)].sort();
+    return result;
+  }
+
+  // Fallback (RPC not created yet): per-model query — slow but correct, so the
+  // page stays accurate (no silent missing platforms) until the SQL is run.
+  console.warn(
+    "get_model_platforms RPC unavailable, falling back to per-model query:",
+    error?.message
+  );
   const { data: models } = await supabase
     .from("models")
     .select("id")
     .eq("is_active", true);
-
-  if (!models) return {};
-
-  const result: Record<number, string[]> = {};
-  for (const m of models) {
-    const { data } = await supabase
+  for (const m of models ?? []) {
+    const { data: rows } = await supabase
       .from("snapshots")
       .select("source")
       .eq("model_id", m.id)
       .limit(100);
-
     const sources = new Set<string>();
-    for (const row of data ?? []) {
-      sources.add(row.source);
-    }
-    if (sources.size > 0) {
-      result[m.id] = Array.from(sources).sort();
-    }
+    for (const row of rows ?? []) sources.add(row.source);
+    if (sources.size > 0) result[m.id] = Array.from(sources).sort();
   }
-
   return result;
 }

@@ -237,6 +237,13 @@ export function PivotTable({
             const rowData = data[m.permaslug] ?? {};
             const cumulative = cumulativeMap[m.permaslug] ?? 0;
             const remark = remarkMap[m.permaslug] ?? "";
+            // Requests metric: models with no request-bearing source (e.g. ZenMux,
+            // tokens-only) have no request data → show "—", not a misleading 0.
+            const reqUnavailable =
+              metric === "requests" &&
+              !(platforms?.[m.id]?.some(
+                (s) => s === "openrouter" || s === "anyint"
+              ) ?? false);
 
             return (
               <tr
@@ -259,7 +266,6 @@ export function PivotTable({
                       style={{ backgroundColor: m.color_hex ?? "#94A0AE" }}
                     />
                     <span className="truncate">
-                      {m.is_own && "⭐ "}
                       {m.display_name}
                     </span>
                   </div>
@@ -289,7 +295,7 @@ export function PivotTable({
 
                 {/* Cumulative */}
                 <td className="py-3 px-4 text-right font-mono font-semibold text-[#1A2332]">
-                  {cumulative > 0 ? fmt(cumulative) : (
+                  {!reqUnavailable && cumulative > 0 ? fmt(cumulative) : (
                     <span className="text-[#94A0AE]">—</span>
                   )}
                 </td>
@@ -302,10 +308,11 @@ export function PivotTable({
                 {/* Toggle column spacer — shows mini sparkline-style summary when collapsed */}
                 <td className="py-3 px-4 text-[#94A0AE] text-xs whitespace-nowrap">
                   {!showDaily && dates.length > 0 && (
-                    <MiniSparkText
-                      values={dates.map((d) => rowData[d])}
-                      fmt={fmt}
-                    />
+                    reqUnavailable ? (
+                      <span>—</span>
+                    ) : (
+                      <MiniSparkText values={dates.map((d) => rowData[d])} fmt={fmt} />
+                    )
                   )}
                 </td>
 
@@ -318,7 +325,7 @@ export function PivotTable({
                         key={d}
                         className="py-3 px-3 text-right font-mono text-[#1A2332]"
                       >
-                        {val != null ? fmt(val) : (
+                        {!reqUnavailable && val != null ? fmt(val) : (
                           <span className="text-[#94A0AE]">—</span>
                         )}
                       </td>
