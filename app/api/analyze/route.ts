@@ -94,6 +94,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // getRankingBreakdown() returns [] on RPC error/timeout (the breakdown RPC is
+  // heavy — ~7s cold). An empty breakdown would silently make EVERY platform's
+  // pool_size=0 (misleading "无法评估身位") AND get cached. Fail visibly instead:
+  // retry once (it's slow, not broken), then bail without caching so the user
+  // can retry against a warm RPC.
+  if (breakdown.length === 0) {
+    breakdown = await getRankingBreakdown();
+  }
+  if (breakdown.length === 0) {
+    return Response.json(
+      {
+        error:
+          "排名分布数据暂不可用（breakdown RPC 可能超时），请重试。未生成分析、未写缓存。",
+      },
+      { status: 503 }
+    );
+  }
+
   const bySlug = new Map(ranking.map((r) => [r.permaslug, r]));
   const idToName = new Map(ranking.map((r) => [r.id, r.display_name]));
 
