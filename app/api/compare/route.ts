@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const slugs = searchParams.getAll("slugs");
   const daysParam = searchParams.get("days");
   const channelParam = searchParams.get("channel"); // "all" | "free" | "standard"
+  const platform = searchParams.get("platform") || undefined; // scope to one source
 
   if (slugs.length === 0) {
     return Response.json({ series: [], events: [] });
@@ -23,6 +24,6 @@ export async function GET(request: NextRequest) {
     ? (channelParam as "all" | "free" | "standard")
     : "all";
 
-  const result = await getDailyUsage(slugs, days, channel);
+  const result = await getDailyUsage(slugs, days, channel, platform);
   return Response.json(result);
 }

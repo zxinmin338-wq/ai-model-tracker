@@ -24,9 +24,29 @@ const platformLabel = (s: string) => PLATFORM_LABELS[s] ?? s;
 function buildPrompt(
   subjectName: string,
   referenceName: string | null,
-  structured: unknown
+  structured: unknown,
+  platformScope?: string // platform label, e.g. "ZenMux" — scope all judgements to it
 ): string {
   const hasRef = !!referenceName;
+
+  if (platformScope) {
+    const sec4 = hasRef
+      ? `\n4. 正面对比：在 ${platformScope} 平台上，${subjectName} 与参照模型 (${referenceName}) 谁的 tokens 更高、高多少倍或百分比？周环比谁涨得更快？只描述谁高谁低与差距，不下任何判断或建议。若参照模型在 ${platformScope} 平台无数据，直接说"参照模型在该平台无数据，无法比较"。`
+      : "";
+    return `你是 AI 模型市场分析助手。基于以下数据，回答这 ${hasRef ? 4 : 3} 个问题（简体中文，280字内）。**所有结论都只在 ${platformScope} 平台上，禁止跨平台比量，不要提其他平台**：
+[输入数据：${JSON.stringify(structured, null, 2)}]
+1. 绝对水平：对比模型 (${subjectName}) 在 ${platformScope} 平台近7天 tokens 是多少？量级极低则标注"(量级极低)"。
+2. 相对身位：对比模型在 ${platformScope} 平台全库模型中排第几？跟哪些模型同档（差距<20%）？距该平台头部差几个数量级？数据量不足则说"该平台数据量不足，不评估身位"。
+3. 周环比趋势：对比模型在 ${platformScope} 平台是上升/平稳/下降？周环比增长率(近7天 vs 前7天, wow_growth_pct)是多少？数据量不足则不评估。${sec4}
+严格规则：
+- 不编数据，数字全部取自输入
+- 只在 ${platformScope} 平台内比较，绝不跨平台比量、不提其他平台
+- 数据量不足时不下结论，明确说明原因（不静默丢弃）
+- 不做任何决策建议，只描述身位与对比
+- 不用"水平/表现/情况"等泛化词
+- 严格输出 ${hasRef ? 4 : 3} 个 numbered sections`;
+  }
+
   const sec4 = hasRef
     ? `\n4. 正面对比：在 ${subjectName} 与参照模型 (${referenceName}) 都有数据的平台上，分别谁的 tokens 更高、高多少倍或百分比？周环比谁涨得更快？只描述谁高谁低与差距，不下任何判断或建议。`
     : "";
@@ -45,7 +65,7 @@ function buildPrompt(
 }
 
 export async function POST(request: NextRequest) {
-  let body: { subject?: string; reference?: string };
+  let body: { subject?: string; reference?: string; platform?: string };
   try {
     body = await request.json();
   } catch {
@@ -55,6 +75,9 @@ export async function POST(request: NextRequest) {
     typeof body.subject === "string" && body.subject ? body.subject : null;
   const reference =
     typeof body.reference === "string" && body.reference ? body.reference : null;
+  // Optional: scope the whole analysis to one platform/source (e.g. "zenmux").
+  const platform =
+    typeof body.platform === "string" && body.platform ? body.platform : null;
   if (!subject) {
     return Response.json({ error: "subject (permaslug) required" }, { status: 400 });
   }
@@ -62,7 +85,7 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceClient();
   const today = new Date().toISOString().slice(0, 10);
   const cacheKey = createHash("sha256")
-    .update(`compare|${subject}|${reference ?? "none"}|${today}`)
+    .update(`compare|${subject}|${reference ?? "none"}|${platform ?? "all"}|${today}`)
     .digest("hex");
 
   const { data: cachedRow } = await supabase
@@ -186,13 +209,15 @@ export async function POST(request: NextRequest) {
     wow_growth_pct?: number | null;
   }
 
-  async function modelStanding(permaslug: string) {
+  async function modelStanding(permaslug: string, onlySource?: string | null) {
     const row = bySlug.get(permaslug);
     if (!row) return { found: false as const, permaslug };
     const perSource = await dailyBySource(row.id);
     const platforms: PlatformStanding[] = [];
     let total = 0;
     for (const [src, dateMap] of perSource) {
+      if (onlySource && src !== onlySource) continue; // scope to one platform
+
       const tokens_7d = [...dateMap.values()].reduce((a, b) => a + b, 0);
       const active_days = [...dateMap.values()].filter((v) => v > 0).length;
       total += tokens_7d;
@@ -236,11 +261,11 @@ export async function POST(request: NextRequest) {
     return { found: true as const, name: row.display_name, total_tokens_7d: total, platforms };
   }
 
-  const subjectData = await modelStanding(subject);
+  const subjectData = await modelStanding(subject, platform);
   if (!subjectData.found) {
     return Response.json({ error: `subject not found: ${subject}` }, { status: 404 });
   }
-  const referenceData = reference ? await modelStanding(reference) : null;
+  const referenceData = reference ? await modelStanding(reference, platform) : null;
   const referenceName =
     referenceData && referenceData.found ? referenceData.name : null;
 
@@ -279,6 +304,7 @@ export async function POST(request: NextRequest) {
   const structured = {
     metric:
       "近7天 tokens(prompt+completion); 身位=对比该平台【全库】所有有数据模型; 仅同平台内比较; trivial平台(有量天数<3)不评估身位/趋势",
+    platform_scope: platform ? platformLabel(platform) : "全部平台",
     subject: { name: subjectData.name, total_tokens_7d: subjectData.total_tokens_7d, platforms: subjectData.platforms },
     reference:
       referenceData && referenceData.found
@@ -297,7 +323,15 @@ export async function POST(request: NextRequest) {
         model: DEEPSEEK_MODEL,
         max_tokens: MAX_TOKENS,
         messages: [
-          { role: "user", content: buildPrompt(subjectData.name, referenceName, structured) },
+          {
+            role: "user",
+            content: buildPrompt(
+              subjectData.name,
+              referenceName,
+              structured,
+              platform ? platformLabel(platform) : undefined
+            ),
+          },
         ],
       }),
       signal: AbortSignal.timeout(90_000),

@@ -93,7 +93,8 @@ export async function getRecentEvents(days: number = 7): Promise<EventRecord[]> 
 export async function getDailyUsage(
   permaslugs: string[],
   days: 7 | 14 | 30,
-  channel: "all" | "free" | "standard" = "all"
+  channel: "all" | "free" | "standard" = "all",
+  source?: string // optional: scope to a single platform (e.g. "zenmux")
 ): Promise<{
   series: DailyUsagePoint[];
   events: Array<{
@@ -128,6 +129,7 @@ export async function getDailyUsage(
     );
   if (channel === "free") snapshotQuery = snapshotQuery.eq("is_free", true);
   if (channel === "standard") snapshotQuery = snapshotQuery.eq("is_free", false);
+  if (source) snapshotQuery = snapshotQuery.eq("source", source); // scope to one platform
   const { data: snapshots } = await snapshotQuery.order("captured_at", { ascending: false });
 
   // Deduplicate: keep latest snapshot per (model_id, usage_date, is_free, source)
