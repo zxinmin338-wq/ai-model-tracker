@@ -1,14 +1,28 @@
-import { getRanking, getModelPlatforms } from "@/lib/queries";
+import {
+  getRanking,
+  getModelPlatforms,
+  getRankingBreakdown,
+} from "@/lib/queries";
 import { CompareClient } from "./compare-client";
 import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function ComparePage() {
-  const [models, platforms] = await Promise.all([
+  const [models, platforms, breakdown] = await Promise.all([
     getRanking(),
     getModelPlatforms(),
+    getRankingBreakdown(),
   ]);
+
+  // per-(model, source) 7d tokens — lets the client default to a model's
+  // largest platform.
+  const platformTokens: Record<number, Record<string, number>> = {};
+  for (const b of breakdown) {
+    (platformTokens[b.model_id] ??= {});
+    platformTokens[b.model_id][b.source] =
+      (platformTokens[b.model_id][b.source] ?? 0) + Number(b.tokens_7d);
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">
@@ -23,7 +37,11 @@ export default async function ComparePage() {
           {t.compare.subtitle}
         </p>
       </div>
-      <CompareClient models={models} platforms={platforms} />
+      <CompareClient
+        models={models}
+        platforms={platforms}
+        platformTokens={platformTokens}
+      />
     </div>
   );
 }

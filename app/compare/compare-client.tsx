@@ -36,10 +36,22 @@ function platformLabel(sources: string[]): string {
 export function CompareClient({
   models,
   platforms,
+  platformTokens,
 }: {
   models: ModelWithUsage[];
   platforms: Record<number, string[]>;
+  platformTokens: Record<number, Record<string, number>>;
 }) {
+  // A model's platform with the most 7d tokens (default scope).
+  const defaultPlatformFor = (permaslug: string): string => {
+    const m = models.find((x) => x.permaslug === permaslug);
+    if (!m) return "";
+    const srcs = platforms[m.id] ?? [];
+    if (srcs.length === 0) return "";
+    const tok = platformTokens[m.id] ?? {};
+    return [...srcs].sort((a, b) => (tok[b] ?? 0) - (tok[a] ?? 0))[0] ?? "";
+  };
+
   // Two-model comparison: subject (required) + reference (optional).
   const [subject, setSubject] = useState<string>(() => {
     const ernie = models.find((m) => m.permaslug === "ernie-5.1");
@@ -52,6 +64,8 @@ export function CompareClient({
     );
     return ds?.permaslug ?? "";
   });
+  // Platform scope (single source, required). Defaults to subject's biggest.
+  const [platform, setPlatform] = useState<string>(() => defaultPlatformFor(subject));
 
   const [metric, setMetric] = useState<Metric>("tokens");
   const [days, setDays] = useState<TimeRange>(7);
@@ -72,14 +86,29 @@ export function CompareClient({
   const referenceModel = reference
     ? models.find((m) => m.permaslug === reference) ?? null
     : null;
-  const selectedModels = useMemo(
-    () => [subjectModel, referenceModel].filter((m): m is ModelWithUsage => !!m),
-    [subjectModel, referenceModel]
+  // Reset platform scope to the subject's biggest platform when subject changes.
+  useEffect(() => {
+    setPlatform(defaultPlatformFor(subject));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject]);
+
+  const subjectPlatforms = subjectModel ? platforms[subjectModel.id] ?? [] : [];
+  const refOnPlatform =
+    !!referenceModel && (platformTokens[referenceModel.id]?.[platform] ?? 0) > 0;
+  // Models actually rendered: subject + reference (only if it has data on the
+  // selected platform). Keeps chart/table/legend scoped to the platform.
+  const displayModels = useMemo(
+    () =>
+      [subjectModel, refOnPlatform ? referenceModel : null].filter(
+        (m): m is ModelWithUsage => !!m
+      ),
+    [subjectModel, referenceModel, refOnPlatform]
   );
-  const selectedSlugs = useMemo(
-    () => new Set(selectedModels.map((m) => m.permaslug)),
-    [selectedModels]
+  const displaySlugs = useMemo(
+    () => new Set(displayModels.map((m) => m.permaslug)),
+    [displayModels]
   );
+  const platformLabelOf = (s: string) => PLATFORM_LABELS[s] ?? s;
 
   // Fetch trend data for the (one or two) selected models
   const fetchData = useCallback(async () => {
@@ -95,6 +124,7 @@ export function CompareClient({
       slugs.forEach((s) => params.append("slugs", s));
       params.set("days", String(days));
       params.set("channel", channel);
+      if (platform) params.set("platform", platform); // scope to one platform
       const res = await fetch(`/api/compare?${params.toString()}`);
       const json = await res.json();
       setSeries(json.series ?? []);
@@ -104,7 +134,7 @@ export function CompareClient({
     } finally {
       setLoading(false);
     }
-  }, [subject, reference, days, channel]);
+  }, [subject, reference, days, channel, platform]);
 
   useEffect(() => {
     fetchData();
@@ -119,7 +149,11 @@ export function CompareClient({
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, reference: reference || undefined }),
+        body: JSON.stringify({
+          subject,
+          reference: reference || undefined,
+          platform: platform || undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok || json.error) {
@@ -135,10 +169,10 @@ export function CompareClient({
     } finally {
       setAnalysisLoading(false);
     }
-  }, [subject, reference]);
+  }, [subject, reference, platform]);
 
   // ─── Chart / table data ──────────────────────────
-  const chartSeries = selectedModels.map((m) => ({
+  const chartSeries = displayModels.map((m) => ({
     key: metric === "tokens" ? m.permaslug : `${m.permaslug}_requests`,
     name: m.display_name,
     color: m.color_hex,
@@ -146,7 +180,7 @@ export function CompareClient({
   }));
 
   const chartEvents = events
-    .filter((e) => selectedSlugs.has(e.permaslug))
+    .filter((e) => displaySlugs.has(e.permaslug))
     .map((e) => ({ date: e.event_date, label: e.label, color: e.color_hex }));
 
   const pivotDates = useMemo(
@@ -156,29 +190,29 @@ export function CompareClient({
 
   const pivotData = useMemo(() => {
     const result: Record<string, Record<string, number | null>> = {};
-    for (const m of selectedModels) result[m.permaslug] = {};
+    for (const m of displayModels) result[m.permaslug] = {};
     for (const row of series) {
       const date = row.date as string;
-      for (const m of selectedModels) {
+      for (const m of displayModels) {
         const key = metric === "tokens" ? m.permaslug : `${m.permaslug}_requests`;
         const val = row[key];
         result[m.permaslug][date] = val != null && val !== "" ? Number(val) : null;
       }
     }
     return result;
-  }, [series, selectedModels, metric]);
+  }, [series, displayModels, metric]);
 
   const pivotEvents = useMemo(
     () =>
       events
-        .filter((e) => selectedSlugs.has(e.permaslug))
+        .filter((e) => displaySlugs.has(e.permaslug))
         .map((e) => ({
           permaslug: e.permaslug,
           event_date: e.event_date,
           label: e.label,
           event_type: e.event_type,
         })),
-    [events, selectedSlugs]
+    [events, displaySlugs]
   );
 
   // ─── Export ───
@@ -187,7 +221,7 @@ export function CompareClient({
   function handleExportCSV() {
     setShowExportMenu(false);
     exportTableCSV(
-      { models: selectedModels, dates: pivotDates, data: pivotData, events: pivotEvents, metric },
+      { models: displayModels, dates: pivotDates, data: pivotData, events: pivotEvents, metric },
       buildExportFilename("compare", startDate, endDate, "csv")
     );
   }
@@ -218,6 +252,9 @@ export function CompareClient({
             platforms={platforms}
             allowClear
             placeholder="选择参照模型…"
+            scopePlatform={platform}
+            platformTokens={platformTokens}
+            scopeLabel={platform ? platformLabelOf(platform) : ""}
           />
         </div>
       </div>
@@ -227,11 +264,52 @@ export function CompareClient({
         <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
           Trends
         </div>
-        <h2 className="text-lg font-semibold text-[#1A2332] mt-1">趋势可视化</h2>
+        <h2 className="text-lg font-semibold text-[#1A2332] mt-1">
+          趋势可视化
+          {platform && (
+            <span className="ml-2 align-middle text-[11px] font-medium px-2 py-0.5 rounded bg-[#EEF3FB] text-[#5B8DEF]">
+              {platformLabelOf(platform)} 平台
+            </span>
+          )}
+        </h2>
+        <p className="text-sm text-[#6B7785] mt-1">
+          图、表、AI 分析均锁定在
+          <span className="font-medium text-[#1A2332]">
+            {" "}
+            {platform ? platformLabelOf(platform) : "—"}{" "}
+          </span>
+          平台口径内，避免跨平台错误比量。
+        </p>
+        {referenceModel && !refOnPlatform && (
+          <div className="mt-3 flex items-start gap-2 text-sm text-[#B26A00] bg-[#FFF6E6] border border-[#FCE3B5] rounded-lg px-3 py-2">
+            <span className="shrink-0">⚠</span>
+            <span>
+              参照模型「{referenceModel.display_name}」在{" "}
+              {platform ? platformLabelOf(platform) : "该"} 平台无数据，
+              趋势图只画对比模型一条线，AI 正面对比将无法进行。
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ─── Controls ─── */}
       <div className="flex items-center gap-5 flex-wrap">
+        <ControlGroup label="平台">
+          {subjectPlatforms.length > 0 ? (
+            <Tabs value={platform} onValueChange={setPlatform}>
+              <TabsList>
+                {subjectPlatforms.map((s) => (
+                  <TabsTrigger key={s} value={s}>
+                    {platformLabelOf(s)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          ) : (
+            <span className="text-sm text-[#94A0AE]">无平台数据</span>
+          )}
+        </ControlGroup>
+
         <ControlGroup label="视图">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
             <TabsList>
@@ -303,7 +381,7 @@ export function CompareClient({
               {t.common.loading}
             </div>
           </div>
-        ) : selectedModels.length === 0 ? (
+        ) : !subjectModel ? (
           <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
             <div className="flex items-center justify-center h-[200px] text-[#94A0AE]">
               请选择对比模型
@@ -312,7 +390,7 @@ export function CompareClient({
         ) : viewMode === "table" ? (
           <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
             <PivotTable
-              models={selectedModels.map((m) => ({
+              models={displayModels.map((m) => ({
                 id: m.id,
                 permaslug: m.permaslug,
                 display_name: m.display_name,
@@ -340,13 +418,13 @@ export function CompareClient({
               />
             </div>
 
-            {selectedModels.length > 0 && series.length > 0 && (
+            {displayModels.length > 0 && series.length > 0 && (
               <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
                 <h3 className="text-sm font-medium mb-3 text-[#6B7785]">
                   {t.compare.totalInRange}（{days}天）
                 </h3>
                 <div className="space-y-2">
-                  {selectedModels.map((m) => {
+                  {displayModels.map((m) => {
                     const key = metric === "tokens" ? m.permaslug : `${m.permaslug}_requests`;
                     const total = series.reduce((sum, row) => sum + (Number(row[key]) || 0), 0);
                     return (
@@ -423,6 +501,9 @@ function ModelSearchSelect({
   platforms,
   allowClear,
   placeholder,
+  scopePlatform,
+  platformTokens,
+  scopeLabel,
 }: {
   label: string;
   value: string;
@@ -431,6 +512,10 @@ function ModelSearchSelect({
   platforms: Record<number, string[]>;
   allowClear?: boolean;
   placeholder?: string;
+  // When set, candidates not on this platform are dimmed + tagged (still selectable).
+  scopePlatform?: string;
+  platformTokens?: Record<number, Record<string, number>>;
+  scopeLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -503,31 +588,53 @@ function ModelSearchSelect({
               {filtered.length === 0 ? (
                 <div className="text-sm text-[#94A0AE] px-2 py-2">无匹配模型</div>
               ) : (
-                filtered.map((m) => (
-                  <button
-                    key={m.permaslug}
-                    onClick={() => {
-                      onChange(m.permaslug);
-                      setOpen(false);
-                      setQ("");
-                    }}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-[#F0F4F8] rounded text-left"
-                  >
-                    <span
-                      className="inline-block h-3 w-3 rounded-full shrink-0"
-                      style={{ backgroundColor: m.color_hex }}
-                    />
-                    <span className="truncate text-[#1A2332] flex-1">{m.display_name}</span>
-                    {platforms[m.id]?.length ? (
-                      <span className="text-[10px] px-1 py-0.5 rounded bg-[#F0F4F8] text-[#6B7785] shrink-0">
-                        {platformLabel(platforms[m.id])}
+                filtered.map((m) => {
+                  // Off-platform = a scope is active and this model has no
+                  // tokens on it. Still selectable, just dimmed + tagged.
+                  const offPlatform =
+                    !!scopePlatform &&
+                    !((platformTokens?.[m.id]?.[scopePlatform] ?? 0) > 0);
+                  return (
+                    <button
+                      key={m.permaslug}
+                      disabled={offPlatform}
+                      title={
+                        offPlatform
+                          ? `该模型在 ${scopeLabel || "该"} 平台无数据，无法对比`
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (offPlatform) return;
+                        onChange(m.permaslug);
+                        setOpen(false);
+                        setQ("");
+                      }}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded text-left ${
+                        offPlatform
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:bg-[#F0F4F8]"
+                      }`}
+                    >
+                      <span
+                        className="inline-block h-3 w-3 rounded-full shrink-0"
+                        style={{ backgroundColor: m.color_hex }}
+                      />
+                      <span className="truncate text-[#1A2332] flex-1">{m.display_name}</span>
+                      {offPlatform ? (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-[#FFF6E6] text-[#B26A00] shrink-0">
+                          {scopeLabel ? `${scopeLabel}无数据` : "该平台无数据"}
+                        </span>
+                      ) : platforms[m.id]?.length ? (
+                        <span className="text-[10px] px-1 py-0.5 rounded bg-[#F0F4F8] text-[#6B7785] shrink-0">
+                          {platformLabel(platforms[m.id])}
+                        </span>
+                      ) : null}
+                      <span className="text-xs text-[#94A0AE] shrink-0">
+                        {m.tokens_7d > 0 ? formatTokens(m.tokens_7d) : "—"}
                       </span>
-                    ) : null}
-                    <span className="text-xs text-[#94A0AE] shrink-0">
-                      {m.tokens_7d > 0 ? formatTokens(m.tokens_7d) : "—"}
-                    </span>
-                  </button>
-                ))
+                    </button>
+                  );
+                })
               )}
             </div>
           </>
