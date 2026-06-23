@@ -3,6 +3,7 @@ export const t = {
   nav: {
     home: '首页',
     compare: '模型对比',
+    vendors: '厂商对比',
   },
   // 状态
   status: {

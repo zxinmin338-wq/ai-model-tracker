@@ -46,6 +46,7 @@ export default function RootLayout({
             <nav className="flex items-center gap-6 text-sm font-medium">
               <NavLink href="/">{t.nav.home}</NavLink>
               <NavLink href="/compare">{t.nav.compare}</NavLink>
+              <NavLink href="/vendors">{t.nav.vendors}</NavLink>
             </nav>
           </div>
         </header>

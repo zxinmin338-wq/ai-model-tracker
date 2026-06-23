@@ -1,0 +1,65 @@
+import { getRanking, getRankingBreakdown } from "@/lib/queries";
+import { aggregateCompanies, platformTotals, type CompanyAggregate } from "@/lib/company";
+import { VendorsClient } from "./vendors-client";
+import { t } from "@/lib/i18n";
+
+export const dynamic = "force-dynamic";
+
+export default async function VendorsPage() {
+  const [ranking, initialBreakdown] = await Promise.all([
+    getRanking(),
+    getRankingBreakdown(),
+  ]);
+  let breakdown = initialBreakdown;
+
+  // getRankingBreakdown() returns [] on RPC error/timeout (heavy RPC, ~7s cold).
+  // The DB always has snapshots, so an empty breakdown means the RPC failed —
+  // NOT "no companies". Fail visibly: retry once, then show an explicit error
+  // instead of a misleading "暂无公司数据" empty state.
+  if (breakdown.length === 0) {
+    breakdown = await getRankingBreakdown();
+  }
+  if (breakdown.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl px-12 py-8">
+        <div className="bg-white border border-[#FCE3B5] bg-[#FFF6E6] rounded-xl p-8 text-[#B26A00]">
+          <h1 className="text-lg font-semibold mb-1">数据暂不可用</h1>
+          <p className="text-sm">
+            排名分布数据（breakdown RPC）可能超时，未能加载公司聚合。请刷新页面重试。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Per-platform company aggregates (ranked). Computed once on the server so the
+  // ranking table + detail + AI all read identical numbers.
+  const totals = platformTotals(breakdown);
+  const platforms = Object.keys(totals)
+    .filter((s) => totals[s] > 0)
+    .sort((a, b) => totals[b] - totals[a]); // most active platform first
+  const companiesByPlatform: Record<string, CompanyAggregate[]> = {};
+  for (const src of platforms) {
+    companiesByPlatform[src] = aggregateCompanies(breakdown, ranking, src);
+  }
+
+  return (
+    <div className="mx-auto max-w-6xl px-12 py-8">
+      <div className="mb-6">
+        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+          Vendors
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332] mt-1">
+          {t.nav.vendors}
+        </h1>
+        <p className="text-base text-[#6B7785] mt-1">
+          按公司聚合：某公司旗下所有模型在某平台的总量、公司间身位与周环比。
+        </p>
+      </div>
+      <VendorsClient
+        platforms={platforms}
+        companiesByPlatform={companiesByPlatform}
+      />
+    </div>
+  );
+}
