@@ -74,14 +74,15 @@ export const t = {
   // 首页
   home: {
     title: 'AI Model Tracker',
-    subtitle: '跨平台 AI 模型调用量追踪',
+    subtitle: '跨平台 AI 模型调用量与市场身位',
     rankings: '模型排行榜',
+    rankingsDesc: '全平台 AI 模型调用量排行',
     thisWeekEvents: '本周事件',
     noEvents: '本周暂无事件记录',
   },
   // 对比页
   compare: {
-    subtitle: '选择 2-5 个模型叠加对比',
+    subtitle: '任选两个模型，在同一平台上对比调用量、身位与趋势',
     totalInRange: '所选周期累计',
   },
   // 详情页

@@ -53,7 +53,7 @@ export default async function VendorsPage() {
           {t.nav.vendors}
         </h1>
         <p className="text-base text-[#6B7785] mt-1">
-          按公司聚合：某公司旗下所有模型在某平台的总量、公司间身位与周环比。
+          按公司聚合，看各厂商旗下模型在某平台的总量与身位
         </p>
       </div>
       <VendorsClient

@@ -216,6 +216,12 @@ export function HomeClient({
         <h2 className="text-xl font-semibold text-[#1A2332] mt-1">
           {t.home.rankings}
         </h2>
+        <p className="text-sm text-[#6B7785] mt-1">
+          {t.home.rankingsDesc}
+        </p>
+        <p className="text-sm text-[#6B7785] mt-1.5">
+          点击模型名查看各平台调用详情 →
+        </p>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 mt-6 mb-4">
@@ -294,6 +300,7 @@ export function HomeClient({
                 >
                   {t.table.growth7d}{sortArrow("growth")}
                 </th>
+                <th className="w-6" aria-hidden />
               </tr>
             </thead>
             <tbody>
@@ -305,7 +312,7 @@ export function HomeClient({
                 return (
                   <tr
                     key={g.key}
-                    className="border-b border-[#E8EEF7] hover:bg-[#F0F4F8] transition-colors"
+                    className="group border-b border-[#E8EEF7] hover:bg-[#F0F4F8] transition-colors"
                   >
                     <td className="py-3 px-2 text-[#94A0AE] font-medium">
                       {i + 1}
@@ -367,13 +374,31 @@ export function HomeClient({
                         <span className="text-[#94A0AE]">—</span>
                       )}
                     </td>
+                    <td className="py-3 px-2 text-right w-6">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        className="inline-block text-[#94A0AE] opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-hidden
+                      >
+                        <path
+                          d="M4.5 3L7.5 6L4.5 9"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </td>
                   </tr>
                 );
               })}
               {sorted.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="text-center text-[#6B7785] py-8"
                   >
                     {t.common.noData}
