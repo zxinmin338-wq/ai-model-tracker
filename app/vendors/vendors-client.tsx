@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatTokens } from "@/lib/format";
+import { AnalysisTermsTooltip } from "@/components/info-tooltip";
 import type { CompanyAggregate } from "@/lib/company";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -222,7 +223,10 @@ export function VendorsClient({
                   <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
                     AI Analysis
                   </div>
-                  <h2 className="text-lg font-semibold text-[#1A2332] mt-1">AI 身位分析</h2>
+                  <h2 className="text-lg font-semibold text-[#1A2332] mt-1 inline-flex items-center gap-1.5">
+                    AI 身位分析
+                    <AnalysisTermsTooltip />
+                  </h2>
                 </div>
                 <button
                   onClick={generateAnalysis}

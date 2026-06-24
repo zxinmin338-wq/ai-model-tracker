@@ -7,6 +7,7 @@ import { PivotTable } from "@/components/pivot-table";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { exportTableCSV, exportElementPNG, buildExportFilename } from "@/lib/export";
 import { t } from "@/lib/i18n";
+import { AnalysisTermsTooltip } from "@/components/info-tooltip";
 import type { ModelWithUsage, DailyUsagePoint } from "@/lib/queries";
 
 type Metric = "tokens" | "requests";
@@ -455,7 +456,10 @@ export function CompareClient({
               <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
                 AI Analysis
               </div>
-              <h2 className="text-lg font-semibold text-[#1A2332] mt-1">AI 身位分析</h2>
+              <h2 className="text-lg font-semibold text-[#1A2332] mt-1 inline-flex items-center gap-1.5">
+                AI 身位分析
+                <AnalysisTermsTooltip />
+              </h2>
             </div>
             <button
               onClick={generateAnalysis}

@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { formatTokens, formatRequests } from "@/lib/format";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { t } from "@/lib/i18n";
 import { logicalModelKey } from "@/lib/queries";
 import type { ModelWithUsage, RankingBreakdownRow } from "@/lib/queries";
@@ -283,7 +284,10 @@ export function HomeClient({
                   {t.table.provider}
                 </th>
                 <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
-                  平台
+                  <span className="inline-flex items-center gap-1">
+                    平台
+                    <InfoTooltip label="平台说明">该模型有调用数据的平台</InfoTooltip>
+                  </span>
                 </th>
                 <th
                   className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
@@ -292,13 +296,21 @@ export function HomeClient({
                   {t.table.tokens7d}{sortArrow("tokens_7d")}
                 </th>
                 <th className="text-right py-3 px-2 font-medium text-[#6B7785]">
-                  {t.table.requests7d}
+                  <span className="inline-flex items-center gap-1">
+                    {t.table.requests7d}
+                    <InfoTooltip label="符号说明">
+                      “—” 表示该平台不提供此项数据（如 ZenMux 不统计请求数）
+                    </InfoTooltip>
+                  </span>
                 </th>
                 <th
                   className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
                   onClick={() => toggleSort("growth")}
                 >
-                  {t.table.growth7d}{sortArrow("growth")}
+                  <span className="inline-flex items-center gap-1">
+                    {t.table.growth7d}{sortArrow("growth")}
+                    <InfoTooltip label="周环比说明">本周调用量相比上周的变化幅度</InfoTooltip>
+                  </span>
                 </th>
                 <th className="w-6" aria-hidden />
               </tr>
