@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { formatTokens, formatRequests } from "@/lib/format";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { RetryBoundary } from "@/components/retry-boundary";
 import { t } from "@/lib/i18n";
 import { logicalModelKey } from "@/lib/queries";
 import type { ModelWithUsage, RankingBreakdownRow } from "@/lib/queries";
@@ -230,7 +231,7 @@ export function HomeClient({
         </div>
         <div className="text-right">
           <div className="font-serif-heading text-[3.25rem] leading-none font-medium text-[#16302B] tabular-nums">
-            {trackedCount}
+            {models.length === 0 ? "—" : trackedCount}
           </div>
           <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8BA39E] mt-1.5">
             {t.kpi.trackedModels}
@@ -238,7 +239,8 @@ export function HomeClient({
         </div>
       </header>
 
-      {/* Model Rankings */}
+      {/* Model Rankings — auto-retry skeleton if the heavy RPC cold-started */}
+      <RetryBoundary empty={models.length === 0} rows={8}>
       <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft px-8 pt-7 pb-3 mb-6">
         <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
           Rankings
@@ -450,6 +452,7 @@ export function HomeClient({
           </table>
         </div>
       </div>
+      </RetryBoundary>
 
     </div>
   );

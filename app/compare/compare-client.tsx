@@ -8,6 +8,7 @@ import { formatTokens, formatRequests } from "@/lib/format";
 import { exportTableCSV, exportElementPNG, buildExportFilename } from "@/lib/export";
 import { t } from "@/lib/i18n";
 import { AnalysisTermsTooltip } from "@/components/info-tooltip";
+import { LoadingCard, LoadingInline } from "@/components/loading";
 import type { ModelWithUsage, DailyUsagePoint } from "@/lib/queries";
 
 type Metric = "tokens" | "requests";
@@ -146,8 +147,8 @@ export function CompareClient({
     if (!subject) return;
     setAnalysisLoading(true);
     setAnalysisError(null);
-    try {
-      const res = await fetch("/api/analyze", {
+    const post = () =>
+      fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -156,6 +157,14 @@ export function CompareClient({
           platform: platform || undefined,
         }),
       });
+    try {
+      let res = await post();
+      // 503 = breakdown RPC cold/timeout. Auto-retry once against a warming DB
+      // instead of surfacing the raw "请重试".
+      if (res.status === 503) {
+        await new Promise((r) => setTimeout(r, 1500));
+        res = await post();
+      }
       const json = await res.json();
       if (!res.ok || json.error) {
         setAnalysisContent(null);
@@ -377,11 +386,7 @@ export function CompareClient({
       {/* ─── Content area (趋势可视化) ─── */}
       <div ref={contentRef}>
         {loading ? (
-          <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
-            <div className="flex items-center justify-center h-[300px] text-[#6B7785]">
-              {t.common.loading}
-            </div>
-          </div>
+          <LoadingCard rows={6} />
         ) : !subjectModel ? (
           <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
             <div className="flex items-center justify-center h-[200px] text-[#94A0AE]">
@@ -471,9 +476,8 @@ export function CompareClient({
           </div>
 
           {analysisLoading && (
-            <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
-              <span className="inline-block h-4 w-4 rounded-full border-2 border-[var(--border-cool)] border-t-[var(--accent-aurora)] animate-spin" />
-              分析生成中
+            <div className="mt-4">
+              <LoadingInline text="正在生成分析…" />
             </div>
           )}
           {analysisError && !analysisLoading && (

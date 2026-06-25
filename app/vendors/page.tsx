@@ -1,6 +1,7 @@
 import { getRanking, getRankingBreakdown } from "@/lib/queries";
 import { aggregateCompanies, platformTotals, type CompanyAggregate } from "@/lib/company";
 import { VendorsClient } from "./vendors-client";
+import { RetryBoundary } from "@/components/retry-boundary";
 import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -14,22 +15,11 @@ export default async function VendorsPage() {
 
   // getRankingBreakdown() returns [] on RPC error/timeout (heavy RPC, ~7s cold).
   // The DB always has snapshots, so an empty breakdown means the RPC failed —
-  // NOT "no companies". Fail visibly: retry once, then show an explicit error
-  // instead of a misleading "暂无公司数据" empty state.
+  // NOT "no companies". Retry once on the server; if still empty, the page shell
+  // still renders and <RetryBoundary> shows a graceful skeleton + auto-refresh
+  // (no ugly "请重试").
   if (breakdown.length === 0) {
     breakdown = await getRankingBreakdown();
-  }
-  if (breakdown.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl px-12 py-8">
-        <div className="bg-white border border-[#FCE3B5] bg-[#FFF6E6] rounded-xl p-8 text-[#B26A00]">
-          <h1 className="text-lg font-semibold mb-1">数据暂不可用</h1>
-          <p className="text-sm">
-            排名分布数据（breakdown RPC）可能超时，未能加载公司聚合。请刷新页面重试。
-          </p>
-        </div>
-      </div>
-    );
   }
 
   // Per-platform company aggregates (ranked). Computed once on the server so the
@@ -65,10 +55,12 @@ export default async function VendorsPage() {
           按公司聚合，看各厂商旗下模型在某平台的总量与身位
         </p>
       </header>
-      <VendorsClient
-        platforms={platforms}
-        companiesByPlatform={companiesByPlatform}
-      />
+      <RetryBoundary empty={platforms.length === 0} rows={9}>
+        <VendorsClient
+          platforms={platforms}
+          companiesByPlatform={companiesByPlatform}
+        />
+      </RetryBoundary>
     </div>
   );
 }

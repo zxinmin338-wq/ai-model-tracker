@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatTokens } from "@/lib/format";
 import { AnalysisTermsTooltip } from "@/components/info-tooltip";
+import { LoadingInline } from "@/components/loading";
 import type { CompanyAggregate } from "@/lib/company";
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -75,12 +76,20 @@ export function VendorsClient({
     if (!brand || !platform) return;
     setAnalysisLoading(true);
     setAnalysisError(null);
-    try {
-      const res = await fetch("/api/company-analyze", {
+    const post = () =>
+      fetch("/api/company-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brand, platform }),
       });
+    try {
+      let res = await post();
+      // 503 = breakdown RPC cold/timeout. Auto-retry once instead of surfacing
+      // the raw "请重试".
+      if (res.status === 503) {
+        await new Promise((r) => setTimeout(r, 1500));
+        res = await post();
+      }
       const json = await res.json();
       if (!res.ok || json.error) {
         setAnalysisContent(null);
@@ -238,9 +247,8 @@ export function VendorsClient({
               </div>
 
               {analysisLoading && (
-                <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
-                  <span className="inline-block h-4 w-4 rounded-full border-2 border-[var(--border-cool)] border-t-[var(--accent-aurora)] animate-spin" />
-                  分析生成中
+                <div className="mt-4">
+                  <LoadingInline text="正在生成分析…" />
                 </div>
               )}
               {analysisError && !analysisLoading && (
