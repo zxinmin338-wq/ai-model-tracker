@@ -194,38 +194,65 @@ export function HomeClient({
 
   return (
     <div className="mx-auto max-w-6xl px-12 py-8">
-      {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332]">
-          {t.home.title}
-        </h1>
-        <p className="text-base text-[#6B7785] mt-1">
-          {t.home.subtitle}
-        </p>
-      </div>
+      {/* Homepage-only aurora wash (scoped pilot). Faint mint→cyan→sky glow
+          bleeding from the top corners over a near-white base; large empty
+          space stays light. Fixed full-bleed; other pages keep their bg. */}
+      <div
+        aria-hidden
+        className="fixed inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(55rem 34rem at 78% -12%, rgba(168,230,207,0.45), transparent 62%), radial-gradient(48rem 32rem at 12% -6%, rgba(198,226,240,0.40), transparent 58%), radial-gradient(40rem 30rem at 95% 8%, rgba(184,231,225,0.30), transparent 60%), linear-gradient(180deg, #F7FBFA 0%, #F3F8F7 55%, #EFF6F4 100%)",
+        }}
+      />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-        <KPICard label={t.kpi.trackedModels} value={String(trackedCount)} />
-      </div>
+      {/* Editorial masthead — title + inline figure, hairline rule below */}
+      <header className="mb-10 flex flex-wrap items-end justify-between gap-x-8 gap-y-4 border-b border-[var(--border-cool)] pb-7">
+        <div className="relative max-w-xl">
+          {/* soft aurora glow behind the title */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -left-10 -top-8 h-40 w-[28rem] -z-10 blur-3xl opacity-70"
+            style={{
+              background:
+                "radial-gradient(50% 60% at 30% 50%, rgba(168,230,207,0.55), transparent 70%), radial-gradient(45% 55% at 70% 40%, rgba(198,226,240,0.5), transparent 72%)",
+            }}
+          />
+          <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--accent-aurora)]">
+            Market Intelligence
+          </div>
+          <h1 className="font-serif-heading text-[2.9rem] leading-[1.05] font-medium tracking-[-0.015em] text-[#16302B] mt-2">
+            {t.home.title}
+          </h1>
+          <p className="text-[15px] text-[#5C726E] mt-2 tracking-tight">
+            {t.home.subtitle}
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="font-serif-heading text-[3.25rem] leading-none font-medium text-[#16302B] tabular-nums">
+            {trackedCount}
+          </div>
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#8BA39E] mt-1.5">
+            {t.kpi.trackedModels}
+          </div>
+        </div>
+      </header>
 
       {/* Model Rankings */}
-      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 mb-6">
-        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+      <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft px-8 pt-7 pb-3 mb-6">
+        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
           Rankings
         </div>
-        <h2 className="text-xl font-semibold text-[#1A2332] mt-1">
+        <h2 className="font-serif-heading text-[1.7rem] font-medium tracking-[-0.01em] text-[#16302B] mt-1.5">
           {t.home.rankings}
         </h2>
-        <p className="text-sm text-[#6B7785] mt-1">
+        <p className="text-sm text-[#5C726E] mt-1.5">
           {t.home.rankingsDesc}
-        </p>
-        <p className="text-sm text-[#6B7785] mt-1.5">
-          点击模型名查看各平台调用详情 →
+          <span className="text-[#8BA39E]"> · 点击模型名查看各平台调用详情 →</span>
         </p>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 mt-6 mb-4">
+        <div className="flex flex-wrap items-center gap-3 mt-6 mb-3">
           <FilterSelect
             label={t.filter.brand}
             value={brandFilter}
@@ -270,32 +297,32 @@ export function HomeClient({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#E8EEF7]">
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785] w-12">
+              <tr className="border-b border-[var(--border-cool)]">
+                <th className="text-left py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E] w-12">
                   #
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
+                <th className="text-left py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E]">
                   {t.table.model}
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
+                <th className="text-left py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E]">
                   {t.table.brand}
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
+                <th className="text-left py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E]">
                   {t.table.provider}
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-[#6B7785]">
+                <th className="text-left py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E]">
                   <span className="inline-flex items-center gap-1">
                     平台
                     <InfoTooltip label="平台说明">该模型有调用数据的平台</InfoTooltip>
                   </span>
                 </th>
                 <th
-                  className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
+                  className="text-right py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E] cursor-pointer select-none"
                   onClick={() => toggleSort("tokens_7d")}
                 >
                   {t.table.tokens7d}{sortArrow("tokens_7d")}
                 </th>
-                <th className="text-right py-3 px-2 font-medium text-[#6B7785]">
+                <th className="text-right py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E]">
                   <span className="inline-flex items-center gap-1">
                     {t.table.requests7d}
                     <InfoTooltip label="符号说明">
@@ -304,7 +331,7 @@ export function HomeClient({
                   </span>
                 </th>
                 <th
-                  className="text-right py-3 px-2 font-medium text-[#6B7785] cursor-pointer select-none"
+                  className="text-right py-3 px-2 text-xs font-medium uppercase tracking-[0.06em] text-[#8BA39E] cursor-pointer select-none"
                   onClick={() => toggleSort("growth")}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -324,7 +351,7 @@ export function HomeClient({
                 return (
                   <tr
                     key={g.key}
-                    className="group border-b border-[#E8EEF7] hover:bg-[#F0F4F8] transition-colors"
+                    className="group border-b border-[#EBF1EF] hover:bg-[#EEF7F4] transition-colors"
                   >
                     <td className="py-3 px-2 text-[#94A0AE] font-medium">
                       {i + 1}
@@ -332,7 +359,7 @@ export function HomeClient({
                     <td className="py-3 px-2">
                       <Link
                         href={`/model/${encodeURIComponent(rep.permaslug)}`}
-                        className="flex items-center gap-2 font-medium text-[#1A2332] hover:text-[#5B8DEF] transition-colors"
+                        className="flex items-center gap-2 font-medium text-[#16302B] hover:text-[var(--accent-aurora)] transition-colors"
                       >
                         <span
                           className="inline-block h-3 w-3 rounded-full shrink-0"
@@ -340,7 +367,7 @@ export function HomeClient({
                         />
                         {rep.display_name}
                         {isNew && (
-                          <span className="text-xs font-medium px-1.5 py-0.5 rounded-md bg-[#E8EEF7] text-[#5B8DEF]">
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded-md bg-[var(--accent-aurora-soft)] text-[var(--accent-aurora-hover)]">
                             {t.common.new}
                           </span>
                         )}
@@ -376,7 +403,9 @@ export function HomeClient({
                       {growth !== null ? (
                         <span
                           className={
-                            growth >= 0 ? "text-[#54B584]" : "text-[#E85B81]"
+                            growth >= 0
+                              ? "text-[var(--trend-up)]"
+                              : "text-[var(--trend-down)]"
                           }
                         >
                           {growth >= 0 ? "↑" : "↓"}
@@ -428,17 +457,6 @@ export function HomeClient({
 
 // ─── Sub-components ─────────────────────────────────
 
-function KPICard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
-      <div className="text-xs font-medium uppercase tracking-wider text-[#6B7785]">
-        {label}
-      </div>
-      <div className="text-2xl font-semibold text-[#1A2332] mt-2">{value}</div>
-    </div>
-  );
-}
-
 function FilterSelect({
   label,
   value,
@@ -454,7 +472,7 @@ function FilterSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="text-sm border border-[#E8EEF7] rounded-lg px-3 py-1.5 bg-white text-[#1A2332] focus:outline-none focus:border-[#5B8DEF] focus:ring-1 focus:ring-[#5B8DEF]/50"
+      className="text-sm border border-[var(--border-cool)] rounded-lg px-3 py-1.5 bg-white/70 text-[#16302B] focus:outline-none focus:border-[var(--accent-aurora)] focus:ring-1 focus:ring-[#4FB5A8]/35"
       aria-label={label}
     >
       {options.map((o) => (

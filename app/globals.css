@@ -92,6 +92,43 @@
   --chart-4: #54B584;
   --chart-5: #F0A856;
   --radius: 0.75rem;
+
+  /* ── Aurora editorial pilot (homepage only for now) ───────────────
+     Soft mint→cyan→sky aurora replacing the AI-blue #5B8DEF on the
+     homepage. Low-saturation, high-value — clean, airy, dawn-like.
+     Distinct names on purpose: --accent is already a shadcn token. */
+  --accent-aurora: #4FB5A8;           /* links / selected — restrained teal */
+  --accent-aurora-hover: #3E9E92;
+  --accent-aurora-soft: rgba(79, 181, 168, 0.12);
+  --aurora-mint: #A8E6CF;
+  --aurora-cyan: #B8E7E1;
+  --aurora-sky: #C6E2F0;
+  --bg-cool: #F5FAF9;                  /* near-white base, faint cool cast */
+  --border-cool: #E2ECEA;
+  /* Gain/loss semantics — deliberately NOT green (avoid stock-ticker "飘绿"
+     and keep the aurora teal as pure ambiance, never gain/loss). Up = neutral
+     deep ink, down = soft muted red. Direction is carried by ↑/↓ arrows too. */
+  --trend-up: #3A4946;
+  --trend-down: #C2675C;
+  --font-serif: 'Newsreader', 'Noto Serif SC', Georgia, 'Times New Roman', serif;
+}
+
+/* Soft, multi-layer, cool-tinted shadows — cards "lift" gently and float over
+   the aurora wash rather than sitting under one hard drop-shadow. */
+.shadow-soft {
+  box-shadow:
+    0 1px 2px rgba(30, 60, 58, 0.04),
+    0 4px 10px rgba(30, 60, 58, 0.05),
+    0 14px 30px rgba(30, 60, 58, 0.06);
+}
+.shadow-soft-lg {
+  box-shadow:
+    0 2px 4px rgba(30, 60, 58, 0.05),
+    0 8px 20px rgba(30, 60, 58, 0.06),
+    0 24px 50px rgba(30, 60, 58, 0.08);
+}
+.font-serif-heading {
+  font-family: var(--font-serif);
 }
 
 @layer base {
