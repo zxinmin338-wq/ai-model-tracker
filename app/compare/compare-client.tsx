@@ -235,7 +235,7 @@ export function CompareClient({
   return (
     <div className="space-y-6">
       {/* ─── Model pickers: 对比模型 + 参照模型 ─── */}
-      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
+      <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-6">
         <div className="flex flex-wrap gap-5">
           <ModelSearchSelect
             label="对比模型"
@@ -262,13 +262,13 @@ export function CompareClient({
 
       {/* ─── 趋势可视化 ─── */}
       <div>
-        <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+        <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
           Trends
         </div>
-        <h2 className="text-lg font-semibold text-[#1A2332] mt-1">
+        <h2 className="font-serif-heading text-lg font-medium text-[#16302B] mt-1">
           趋势可视化
           {platform && (
-            <span className="ml-2 align-middle text-[11px] font-medium px-2 py-0.5 rounded bg-[#EEF3FB] text-[#5B8DEF]">
+            <span className="ml-2 align-middle text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--accent-aurora-soft)] text-[var(--accent-aurora)]">
               {platformLabelOf(platform)} 平台
             </span>
           )}
@@ -352,7 +352,7 @@ export function CompareClient({
         <div className="relative ml-auto">
           <button
             onClick={() => setShowExportMenu((v) => !v)}
-            className="flex items-center gap-1.5 text-sm font-medium text-[#6B7785] hover:text-[#5B8DEF] border border-[#E8EEF7] rounded-lg px-3 py-1.5 bg-white transition-colors"
+            className="flex items-center gap-1.5 text-sm font-medium text-[#6B7785] hover:text-[var(--accent-aurora)] border border-[var(--border-cool)] rounded-lg px-3 py-1.5 bg-white transition-colors"
           >
             {t.common.export}
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -362,7 +362,7 @@ export function CompareClient({
           {showExportMenu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowExportMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-[#E8EEF7] rounded-lg shadow-lg py-1 min-w-[180px]">
+              <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-[var(--border-cool)] rounded-lg shadow-lg py-1 min-w-[180px]">
                 {viewMode === "table" ? (
                   <ExportMenuItem label="导出表格 (CSV)" onClick={handleExportCSV} />
                 ) : (
@@ -377,19 +377,19 @@ export function CompareClient({
       {/* ─── Content area (趋势可视化) ─── */}
       <div ref={contentRef}>
         {loading ? (
-          <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+          <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
             <div className="flex items-center justify-center h-[300px] text-[#6B7785]">
               {t.common.loading}
             </div>
           </div>
         ) : !subjectModel ? (
-          <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+          <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
             <div className="flex items-center justify-center h-[200px] text-[#94A0AE]">
               请选择对比模型
             </div>
           </div>
         ) : viewMode === "table" ? (
-          <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft overflow-hidden">
             <PivotTable
               models={displayModels.map((m) => ({
                 id: m.id,
@@ -410,7 +410,7 @@ export function CompareClient({
           </div>
         ) : (
           <>
-            <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+            <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
               <TrendChart
                 data={series}
                 series={chartSeries}
@@ -420,7 +420,7 @@ export function CompareClient({
             </div>
 
             {displayModels.length > 0 && series.length > 0 && (
-              <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+              <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
                 <h3 className="text-sm font-medium mb-3 text-[#6B7785]">
                   {t.compare.totalInRange}（{days}天）
                 </h3>
@@ -450,13 +450,13 @@ export function CompareClient({
 
       {/* ─── AI 身位分析 ─── */}
       {subjectModel && (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
+        <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
                 AI Analysis
               </div>
-              <h2 className="text-lg font-semibold text-[#1A2332] mt-1 inline-flex items-center gap-1.5">
+              <h2 className="font-serif-heading text-lg font-medium text-[#16302B] mt-1 inline-flex items-center gap-1.5">
                 AI 身位分析
                 <AnalysisTermsTooltip />
               </h2>
@@ -464,7 +464,7 @@ export function CompareClient({
             <button
               onClick={generateAnalysis}
               disabled={analysisLoading}
-              className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[#5B8DEF] text-white hover:bg-[#4A7DDF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[var(--accent-aurora)] text-white hover:bg-[var(--accent-aurora-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
               {analysisLoading ? "分析生成中…" : "生成 AI 分析"}
             </button>
@@ -472,7 +472,7 @@ export function CompareClient({
 
           {analysisLoading && (
             <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
-              <span className="inline-block h-4 w-4 rounded-full border-2 border-[#E8EEF7] border-t-[#5B8DEF] animate-spin" />
+              <span className="inline-block h-4 w-4 rounded-full border-2 border-[var(--border-cool)] border-t-[var(--accent-aurora)] animate-spin" />
               分析生成中
             </div>
           )}
@@ -484,7 +484,7 @@ export function CompareClient({
               <div className="space-y-1.5 text-sm text-[#1A2332] leading-relaxed">
                 {renderAnalysis(analysisContent)}
               </div>
-              <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[#E8EEF7]">
+              <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[var(--border-cool)]">
                 本判断由 AI 基于截至 {analysisDate} 数据生成，可能有误，请结合原始数据核对。
               </p>
             </div>
@@ -544,7 +544,7 @@ function ModelSearchSelect({
       <div className="relative">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="w-full flex items-center justify-between gap-2 text-sm border border-[#E8EEF7] rounded-lg px-3 py-2 bg-white text-left hover:border-[#5B8DEF] transition-colors"
+          className="w-full flex items-center justify-between gap-2 text-sm border border-[var(--border-cool)] rounded-lg px-3 py-2 bg-white text-left hover:border-[var(--accent-aurora)] transition-colors"
         >
           {selected ? (
             <span className="flex items-center gap-2 min-w-0">
@@ -569,13 +569,13 @@ function ModelSearchSelect({
         {open && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-            <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-[#E8EEF7] rounded-lg shadow-lg p-2 max-h-[340px] overflow-auto">
+            <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white border border-[var(--border-cool)] rounded-lg shadow-lg p-2 max-h-[340px] overflow-auto">
               <input
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="搜索模型 / 公司…"
-                className="w-full text-sm border border-[#E8EEF7] rounded-md px-2 py-1.5 mb-2 focus:outline-none focus:border-[#5B8DEF]"
+                className="w-full text-sm border border-[var(--border-cool)] rounded-md px-2 py-1.5 mb-2 focus:outline-none focus:border-[var(--accent-aurora)]"
               />
               {allowClear && (
                 <button

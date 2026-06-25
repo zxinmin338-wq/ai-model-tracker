@@ -38,7 +38,7 @@ export function InfoTooltip({
       <button
         type="button"
         aria-label={label}
-        className="inline-flex items-center text-[#94A0AE] hover:text-[#6B7785] focus:outline-none focus-visible:text-[#5B8DEF] cursor-help"
+        className="inline-flex items-center text-[#94A0AE] hover:text-[#6B7785] focus:outline-none focus-visible:text-[var(--accent-aurora)] cursor-help"
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onClick={(e) => {

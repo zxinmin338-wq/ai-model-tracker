@@ -148,7 +148,7 @@ export function ModelDetailClient({
 
   // Status badge
   const statusColors: Record<string, string> = {
-    free: "bg-[#E8EEF7] text-[#5B8DEF]",
+    free: "bg-[var(--accent-aurora-soft)] text-[var(--accent-aurora-hover)]",
     paid: "bg-[#F0F4F8] text-[#6B7785]",
     transitioning: "bg-[#FFF3E0] text-[#F0A856]",
     deprecated: "bg-[#FDECEA] text-[#E85B81]",
@@ -162,7 +162,7 @@ export function ModelDetailClient({
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1 text-sm text-[#6B7785] hover:text-[#5B8DEF] transition-colors"
+        className="inline-flex items-center gap-1 text-sm text-[#6B7785] hover:text-[var(--accent-aurora)] transition-colors"
       >
         {t.detail.backToRankings}
       </Link>
@@ -174,7 +174,7 @@ export function ModelDetailClient({
             className="inline-block h-4 w-4 rounded-full shrink-0"
             style={{ backgroundColor: model.color_hex }}
           />
-          <h1 className="text-3xl font-semibold tracking-tight text-[#1A2332]">
+          <h1 className="font-serif-heading text-[2.4rem] leading-[1.05] font-medium tracking-[-0.015em] text-[#16302B]">
             {model.display_name}
           </h1>
           {model.current_status && (
@@ -187,7 +187,7 @@ export function ModelDetailClient({
             </span>
           )}
           {isNew && (
-            <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[#E8EEF7] text-[#5B8DEF]">
+            <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[var(--accent-aurora-soft)] text-[var(--accent-aurora-hover)]">
               {t.common.new}
             </span>
           )}
@@ -236,7 +236,7 @@ export function ModelDetailClient({
       </div>
 
       {/* Trend Chart */}
-      <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+      <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
         {loading ? (
           <div className="flex items-center justify-center h-[400px] text-[#6B7785]">
             {t.common.loading}
@@ -269,12 +269,12 @@ export function ModelDetailClient({
       {/* 3-Hour Distribution Bar Chart — only meaningful for sources with real
           hourly data (OpenRouter). Daily-grain models (anyint/zenmux) get a note. */}
       {!hasHourlyData ? (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center">
+        <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8 text-center">
           <p className="text-[#6B7785]">{t.detail.noHourlyData}</p>
         </div>
       ) : validBuckets.length > 0 ? (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
-          <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+        <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
             Distribution
           </div>
           <h3 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
@@ -353,7 +353,7 @@ export function ModelDetailClient({
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8 text-center">
+        <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8 text-center">
           <p className="text-[#6B7785]">
             {t.detail.peakValleyNoData}
           </p>
@@ -378,8 +378,8 @@ export function ModelDetailClient({
 
       {/* Event Timeline */}
       {events.length > 0 && (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
-          <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+        <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
+          <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
             Timeline
           </div>
           <h3 className="text-xl font-semibold text-[#1A2332] mt-1 mb-6">
@@ -433,12 +433,12 @@ function PeakValley3hCard({
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
-    <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
-      <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785] mb-4">
+    <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
+      <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)] mb-4">
         {title}
       </div>
 
-      <div className="text-2xl font-semibold text-[#1A2332] mb-1">
+      <div className="font-serif-heading text-[1.9rem] font-medium text-[#16302B] mb-1">
         UTC {pad(bucket.startHour)}:00 – {pad(bucket.endHour % 24)}:00
       </div>
       <div className="text-base font-medium mb-4" style={{ color: colorHex }}>

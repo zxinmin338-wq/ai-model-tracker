@@ -124,7 +124,7 @@ export function VendorsClient({
       </div>
 
       {companies.length === 0 ? (
-        <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-8">
+        <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-8">
           <div className="flex items-center justify-center h-[160px] text-[#94A0AE]">
             该平台暂无公司数据
           </div>
@@ -132,11 +132,11 @@ export function VendorsClient({
       ) : (
         <>
           {/* ─── 公司排行榜 ─── */}
-          <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-            <div className="px-6 pt-5 pb-3 border-b border-[#F0F4F8]">
-              <h2 className="text-lg font-semibold text-[#1A2332]">
+          <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft overflow-hidden">
+            <div className="px-6 pt-5 pb-3 border-b border-[var(--border-cool)]">
+              <h2 className="font-serif-heading text-lg font-medium text-[#16302B]">
                 公司排行榜
-                <span className="ml-2 align-middle text-[11px] font-medium px-2 py-0.5 rounded bg-[#EEF3FB] text-[#5B8DEF]">
+                <span className="ml-2 align-middle text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--accent-aurora-soft)] text-[var(--accent-aurora)]">
                   {platformLabel(platform)} · 共 {companies.length} 家
                 </span>
               </h2>
@@ -158,14 +158,14 @@ export function VendorsClient({
                     <tr
                       key={c.brand}
                       onClick={() => setBrand(c.brand)}
-                      className={`cursor-pointer border-t border-[#F0F4F8] transition-colors ${
-                        isSel ? "bg-[#EEF3FB]" : "hover:bg-[#F7FAFD]"
+                      className={`cursor-pointer border-t border-[var(--border-cool)] transition-colors ${
+                        isSel ? "bg-[var(--accent-aurora-soft)]" : "hover:bg-[#EEF7F4]"
                       }`}
                     >
                       <td className="px-6 py-2.5 text-[#6B7785] tabular-nums">{c.rank}</td>
                       <td className="px-6 py-2.5 font-medium text-[#1A2332]">
                         {isSel && (
-                          <span className="inline-block h-2 w-2 rounded-full bg-[#5B8DEF] mr-2 align-middle" />
+                          <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent-aurora)] mr-2 align-middle" />
                         )}
                         {c.brand}
                       </td>
@@ -187,8 +187,8 @@ export function VendorsClient({
 
           {/* ─── 选中公司详情 ─── */}
           {selected && (
-            <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
-              <h2 className="text-lg font-semibold text-[#1A2332] mb-4">
+            <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-6">
+              <h2 className="font-serif-heading text-lg font-medium text-[#16302B] mb-4">
                 {selected.brand}
                 <span className="ml-2 text-sm font-normal text-[#6B7785]">
                   在 {platformLabel(platform)} 平台
@@ -217,13 +217,13 @@ export function VendorsClient({
 
           {/* ─── AI 身位分析 ─── */}
           {selected && (
-            <div className="bg-white border border-[#E8EEF7] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-6">
+            <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm font-medium uppercase tracking-wider text-[#6B7785]">
+                  <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--accent-aurora)]">
                     AI Analysis
                   </div>
-                  <h2 className="text-lg font-semibold text-[#1A2332] mt-1 inline-flex items-center gap-1.5">
+                  <h2 className="font-serif-heading text-lg font-medium text-[#16302B] mt-1 inline-flex items-center gap-1.5">
                     AI 身位分析
                     <AnalysisTermsTooltip />
                   </h2>
@@ -231,7 +231,7 @@ export function VendorsClient({
                 <button
                   onClick={generateAnalysis}
                   disabled={analysisLoading}
-                  className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[#5B8DEF] text-white hover:bg-[#4A7DDF] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  className="shrink-0 text-sm font-medium px-4 py-2 rounded-lg bg-[var(--accent-aurora)] text-white hover:bg-[var(--accent-aurora-hover)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                   {analysisLoading ? "分析生成中…" : "生成 AI 分析"}
                 </button>
@@ -239,19 +239,19 @@ export function VendorsClient({
 
               {analysisLoading && (
                 <div className="flex items-center gap-2 text-sm text-[#6B7785] mt-4">
-                  <span className="inline-block h-4 w-4 rounded-full border-2 border-[#E8EEF7] border-t-[#5B8DEF] animate-spin" />
+                  <span className="inline-block h-4 w-4 rounded-full border-2 border-[var(--border-cool)] border-t-[var(--accent-aurora)] animate-spin" />
                   分析生成中
                 </div>
               )}
               {analysisError && !analysisLoading && (
-                <div className="text-sm text-[#E85B81] mt-4">{analysisError}</div>
+                <div className="text-sm text-[var(--trend-down)] mt-4">{analysisError}</div>
               )}
               {analysisContent && !analysisLoading && (
                 <div className="mt-4">
                   <div className="space-y-1.5 text-sm text-[#1A2332] leading-relaxed">
                     {renderAnalysis(analysisContent)}
                   </div>
-                  <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[#E8EEF7]">
+                  <p className="text-xs text-[#94A0AE] mt-4 pt-3 border-t border-[var(--border-cool)]">
                     本判断由 AI 基于截至 {analysisDate} 数据生成，可能有误，请结合原始数据核对。
                   </p>
                 </div>
@@ -272,7 +272,7 @@ function WowBadge({ pct }: { pct: number | null }) {
   const up = pct > 0;
   const flat = pct === 0;
   return (
-    <span className={flat ? "text-[#6B7785]" : up ? "text-[#1FA971]" : "text-[#E85B81]"}>
+    <span className={flat ? "text-[#6B7785]" : up ? "text-[var(--trend-up)]" : "text-[var(--trend-down)]"}>
       {up ? "+" : ""}
       {pct}%
     </span>

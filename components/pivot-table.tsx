@@ -180,7 +180,7 @@ export function PivotTable({
 
             {/* Cumulative — right after fixed cols */}
             <th
-              className="text-right py-3 px-4 font-medium text-[#6B7785] w-[100px] min-w-[100px] cursor-pointer select-none hover:text-[#5B8DEF] transition-colors"
+              className="text-right py-3 px-4 font-medium text-[#6B7785] w-[100px] min-w-[100px] cursor-pointer select-none hover:text-[var(--accent-aurora)] transition-colors"
               onClick={() => toggleSort("cumulative")}
             >
               {t.table.cumulative}{sortArrow("cumulative")}
@@ -193,7 +193,7 @@ export function PivotTable({
 
             {/* Daily toggle header */}
             <th
-              className="text-left py-3 px-4 font-medium text-[#5B8DEF] cursor-pointer select-none whitespace-nowrap"
+              className="text-left py-3 px-4 font-medium text-[var(--accent-aurora)] cursor-pointer select-none whitespace-nowrap"
               onClick={() => setShowDaily((v) => !v)}
             >
               <span className="inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity">
@@ -223,7 +223,7 @@ export function PivotTable({
               dates.map((d) => (
                 <th
                   key={d}
-                  className="text-right py-3 px-3 font-medium text-[#6B7785] w-[80px] min-w-[80px] cursor-pointer select-none hover:text-[#5B8DEF] transition-colors"
+                  className="text-right py-3 px-3 font-medium text-[#6B7785] w-[80px] min-w-[80px] cursor-pointer select-none hover:text-[var(--accent-aurora)] transition-colors"
                   onClick={() => toggleSort(d)}
                 >
                   {fmtDate(d)}{sortArrow(d)}
