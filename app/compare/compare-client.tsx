@@ -244,7 +244,10 @@ export function CompareClient({
   return (
     <div className="space-y-6">
       {/* ─── Model pickers: 对比模型 + 参照模型 ─── */}
-      <div className="bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-6">
+      {/* relative z-20: lift this card's stacking context (incl. the overflowing
+          search dropdown) above the trend/filter cards below, which otherwise
+          paint through it because each backdrop-blur card is its own context. */}
+      <div className="relative z-20 bg-white/75 backdrop-blur-[3px] border border-[var(--border-cool)] rounded-[20px] shadow-soft p-6">
         <div className="flex flex-wrap gap-5">
           <ModelSearchSelect
             label="对比模型"
