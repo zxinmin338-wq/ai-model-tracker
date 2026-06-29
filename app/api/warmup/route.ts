@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { getRanking, getRankingBreakdown, getModelPlatforms } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -41,11 +40,10 @@ export async function GET(request: NextRequest) {
 
   const t0 = Date.now();
 
-  // Refresh the materialized views the homepage reads from.
-  const { error: refreshErr } = await supabase.rpc("refresh_ranking_caches");
-  const refreshMs = Date.now() - t0;
-
-  // Confirm the views now serve data (these reads hit the MVs, so they're instant).
+  // Health check: confirm the homepage's materialized views serve data. Refresh
+  // is handled by a pg_cron job inside Postgres (the API path hits the ~8s
+  // statement timeout), so this endpoint no longer needs to refresh — reads hit
+  // the MVs and are instant. The external keep-warm cron is now optional.
   const [ranking, breakdown, platforms] = await Promise.all([
     timeOnce(getRanking),
     timeOnce(getRankingBreakdown),
@@ -59,9 +57,6 @@ export async function GET(request: NextRequest) {
     {
       ok: true,
       fresh,
-      refreshed: !refreshErr,
-      refresh_error: refreshErr?.message ?? null,
-      refresh_ms: refreshMs,
       total_ms: Date.now() - t0,
       counts: {
         ranking: ranking.count,
