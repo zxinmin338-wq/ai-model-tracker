@@ -15,28 +15,35 @@
 -- ⚠️ If CREATE MATERIALIZED VIEW times out (cold get_ranking_7d), just run this
 -- block again — the first (failed) attempt warms the buffers, the second succeeds.
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS ranking_7d_mv AS
-  SELECT * FROM get_ranking_7d();
+-- The SQL editor session's search_path may not include public, so the inlined
+-- `FROM snapshots` inside get_ranking_7d() fails to resolve. Set it explicitly.
+SET search_path TO public, extensions;
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS ranking_breakdown_7d_mv AS
-  SELECT * FROM get_ranking_breakdown_7d();
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.ranking_7d_mv AS
+  SELECT * FROM public.get_ranking_7d();
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.ranking_breakdown_7d_mv AS
+  SELECT * FROM public.get_ranking_breakdown_7d();
 
 -- One RPC the app/cron can call to refresh both. Non-concurrent REFRESH (brief
 -- lock, fine for low traffic) so it can run inside this function's transaction.
 -- SET LOCAL raises the timeout for THIS refresh only, so the heavy underlying
--- query completes even when cold (the API's default ~8s timeout would kill it).
-CREATE OR REPLACE FUNCTION refresh_ranking_caches()
-RETURNS void LANGUAGE plpgsql AS $$
+-- query completes even when cold. SET search_path = public so the inlined
+-- `FROM snapshots` resolves when the cron calls this.
+CREATE OR REPLACE FUNCTION public.refresh_ranking_caches()
+RETURNS void LANGUAGE plpgsql
+SET search_path = public
+AS $$
 BEGIN
   SET LOCAL statement_timeout = '90s';
-  REFRESH MATERIALIZED VIEW ranking_7d_mv;
-  REFRESH MATERIALIZED VIEW ranking_breakdown_7d_mv;
+  REFRESH MATERIALIZED VIEW public.ranking_7d_mv;
+  REFRESH MATERIALIZED VIEW public.ranking_breakdown_7d_mv;
 END $$;
 
 -- Let the API roles read the views and call the refresh.
-GRANT SELECT ON ranking_7d_mv TO anon, authenticated, service_role;
-GRANT SELECT ON ranking_breakdown_7d_mv TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION refresh_ranking_caches() TO anon, authenticated, service_role;
+GRANT SELECT ON public.ranking_7d_mv TO anon, authenticated, service_role;
+GRANT SELECT ON public.ranking_breakdown_7d_mv TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.refresh_ranking_caches() TO anon, authenticated, service_role;
 
 -- Sanity check (should return ~200 rows instantly):
 --   SELECT count(*) FROM ranking_7d_mv;
