@@ -52,20 +52,13 @@ export async function getRanking(): Promise<ModelWithUsage[]> {
   const { data, error } = await supabase.rpc("get_ranking_7d");
 
   if (error) {
+    // IMPORTANT: do NOT fall back to models-with-zero-usage. A cold get_ranking_7d
+    // hits the statement timeout; returning 228 rows of tokens_7d=0 looks like
+    // "loaded" to callers (length > 0) but renders a broken "0 models" board and
+    // makes /api/warmup report a false "warm". Return empty = "not ready" so
+    // callers retry / show a skeleton until the real ranking is available.
     console.error("getRanking error:", error);
-    // Fallback: simple query
-    const { data: models } = await supabase
-      .from("models")
-      .select("*")
-      .eq("is_active", true)
-      .order("display_name");
-    return (models ?? []).map((m) => ({
-      ...m,
-      tokens_7d: 0,
-      requests_7d: 0,
-      tokens_prev_7d: 0,
-      requests_prev_7d: 0,
-    }));
+    return [];
   }
   return data ?? [];
 }
