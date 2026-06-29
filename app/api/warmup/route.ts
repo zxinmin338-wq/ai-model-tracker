@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
+import { supabase } from "@/lib/supabase";
 import { getRanking, getRankingBreakdown, getModelPlatforms } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
-// Cold heavy RPCs can take ~10s each and may need a couple back-to-back runs to
-// warm Postgres's buffers, so give the function room beyond Vercel's 10s default.
+// Refreshing the materialized views runs the heavy query once; can take ~15s when
+// cold, so give the function room beyond Vercel's 10s default.
 export const maxDuration = 30;
 
-// Time a single call and report how many rows/keys it returned (0 == failed/cold).
 async function timeOnce<T>(fn: () => Promise<T>): Promise<{ ms: number; count: number }> {
   const t0 = Date.now();
   const result = await fn();
@@ -19,9 +19,13 @@ async function timeOnce<T>(fn: () => Promise<T>): Promise<{ ms: number; count: n
   return { ms, count };
 }
 
-// Keep-alive endpoint: hit every ~5 min by an external cron (cron-job.org) so the
-// heavy RPCs stay warm in Postgres and never cold-start on a real user's first
-// request. Auth: if CRON_SECRET is set, require it via
+// Keep-fresh endpoint: hit every ~5 min by an external cron (cron-job.org). The
+// homepage now reads precomputed materialized views (docs/batch10) instead of the
+// live heavy query, so this endpoint's job is to REFRESH those views. The refresh
+// function raises its own statement_timeout, so it completes even when cold — and
+// if it ever fails, the views keep serving the last good snapshot (never empty).
+//
+// Auth: if CRON_SECRET is set, require it via
 //   Authorization: Bearer <CRON_SECRET>  or  ?secret=<CRON_SECRET>
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -36,52 +40,33 @@ export async function GET(request: NextRequest) {
   }
 
   const t0 = Date.now();
-  const BUDGET_MS = 24_000; // stay under maxDuration (30s) and the cron's timeout
 
-  // Retry an RPC back-to-back (no sleep — keep buffers hot) until it returns rows
-  // or we run out of budget. get_ranking_7d AND the breakdown RPC both hit the
-  // statement timeout when cold (returning empty), but a few back-to-back calls
-  // warm the buffers. This is what makes ONE cron ping reliably warm the DB —
-  // critically, ranking must be retried too, otherwise it stays perpetually cold
-  // and the homepage's first visitor eats the ~10s timeout.
-  const warmRetry = async (
-    fn: () => Promise<unknown>,
-    maxAttempts = 5
-  ): Promise<{ ms: number; count: number; attempts: number }> => {
-    let ms = 0;
-    let count = 0;
-    let attempts = 0;
-    while (attempts < maxAttempts && Date.now() - t0 < BUDGET_MS) {
-      attempts++;
-      const r = await timeOnce(fn);
-      ms += r.ms;
-      count = r.count;
-      if (count > 0) break;
-    }
-    return { ms, count, attempts };
-  };
+  // Refresh the materialized views the homepage reads from.
+  const { error: refreshErr } = await supabase.rpc("refresh_ranking_caches");
+  const refreshMs = Date.now() - t0;
 
-  // platforms is the fast skip-scan and rarely cold — one shot.
-  const platforms = await timeOnce(getModelPlatforms);
-  // ranking + breakdown are the heavy, cold-prone ones — retry until warm.
-  const ranking = await warmRetry(getRanking);
-  const breakdown = await warmRetry(getRankingBreakdown);
+  // Confirm the views now serve data (these reads hit the MVs, so they're instant).
+  const [ranking, breakdown, platforms] = await Promise.all([
+    timeOnce(getRanking),
+    timeOnce(getRankingBreakdown),
+    timeOnce(getModelPlatforms),
+  ]);
 
-  const totalMs = Date.now() - t0;
-
-  // Warm only if every RPC returned data; empty means a RPC failed (timeout) and
-  // the DB is NOT actually warm.
-  const warm = ranking.count > 0 && breakdown.count > 0 && platforms.count > 0;
+  const fresh =
+    ranking.count > 0 && breakdown.count > 0 && platforms.count > 0;
 
   return Response.json(
     {
       ok: true,
-      warm,
-      total_ms: totalMs,
-      timings: {
-        getRanking: ranking,
-        getRankingBreakdown: breakdown,
-        getModelPlatforms: platforms,
+      fresh,
+      refreshed: !refreshErr,
+      refresh_error: refreshErr?.message ?? null,
+      refresh_ms: refreshMs,
+      total_ms: Date.now() - t0,
+      counts: {
+        ranking: ranking.count,
+        breakdown: breakdown.count,
+        platforms: platforms.count,
       },
       at: new Date().toISOString(),
     },

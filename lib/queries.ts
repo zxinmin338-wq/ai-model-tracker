@@ -49,14 +49,22 @@ export interface EventRecord {
 // ─── Ranking (Homepage) ─────────────────────────────
 
 export async function getRanking(): Promise<ModelWithUsage[]> {
-  const { data, error } = await supabase.rpc("get_ranking_7d");
+  // Fast path: read the precomputed materialized view (docs/batch10). It's a tiny
+  // ~200-row table → instant, never times out, and always holds the LAST GOOD
+  // snapshot, so the homepage never shows an empty / "0 models" board even when
+  // the live query would be cold.
+  const mv = await supabase
+    .from("ranking_7d_mv")
+    .select("*")
+    .order("tokens_7d", { ascending: false });
+  if (!mv.error && mv.data && mv.data.length > 0) {
+    return mv.data as ModelWithUsage[];
+  }
 
+  // Fallback (MV not created yet / empty): the live RPC. Return [] on error —
+  // never fake a zero-usage board (that breaks callers and false-warms /warmup).
+  const { data, error } = await supabase.rpc("get_ranking_7d");
   if (error) {
-    // IMPORTANT: do NOT fall back to models-with-zero-usage. A cold get_ranking_7d
-    // hits the statement timeout; returning 228 rows of tokens_7d=0 looks like
-    // "loaded" to callers (length > 0) but renders a broken "0 models" board and
-    // makes /api/warmup report a false "warm". Return empty = "not ready" so
-    // callers retry / show a skeleton until the real ranking is available.
     console.error("getRanking error:", error);
     return [];
   }
@@ -336,6 +344,12 @@ export interface RankingBreakdownRow {
 // filter is active. Summing every row of a model == its get_ranking_7d total,
 // so the unfiltered ("all/all") view stays identical.
 export async function getRankingBreakdown(): Promise<RankingBreakdownRow[]> {
+  // Fast path: precomputed materialized view (docs/batch10) — instant, last-good.
+  const mv = await supabase.from("ranking_breakdown_7d_mv").select("*");
+  if (!mv.error && mv.data && mv.data.length > 0) {
+    return mv.data as RankingBreakdownRow[];
+  }
+  // Fallback (MV not created yet / empty): live RPC.
   const { data, error } = await supabase.rpc("get_ranking_breakdown_7d");
   if (error) {
     console.error("getRankingBreakdown error:", error);
