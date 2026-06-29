@@ -479,9 +479,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ─── Refresh homepage materialized views ───
+  // We just inserted a batch of snapshots, so get_ranking_7d's buffers are hot —
+  // the refresh completes well under the statement timeout here (it would time
+  // out from a cold path). This keeps ranking_7d_mv / ranking_breakdown_7d_mv
+  // (what the homepage reads) current after every collection run.
+  let mvRefreshed = false;
+  try {
+    const { error: refErr } = await supabase.rpc("refresh_ranking_caches");
+    mvRefreshed = !refErr;
+    if (refErr) errors.push(`mv-refresh: ${refErr.message}`);
+  } catch (e) {
+    errors.push(`mv-refresh: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   return Response.json({
     ok: true,
     inserted,
+    mv_refreshed: mvRefreshed,
     zenmux_inserted: zenmuxInserted,
     zenmux_model_decisions: zenmuxModelDecisions,
     or_discovered_inserted: orDiscoveredInserted,
