@@ -52,3 +52,9 @@ GRANT EXECUTE ON FUNCTION public.refresh_ranking_caches() TO anon, authenticated
 -- Sanity check (should return ~200 rows instantly):
 --   SELECT count(*) FROM ranking_7d_mv;
 --   SELECT display_name, tokens_7d FROM ranking_7d_mv ORDER BY tokens_7d DESC LIMIT 3;
+
+-- The refresh (both views) can take >8s, but service_role's default statement
+-- timeout is ~8s and the function's SET LOCAL can't raise the already-armed
+-- outer statement. Raise it for the backend role only (public reads via anon
+-- stay capped; they hit the fast MV anyway). Required for /api/fetch's refresh.
+ALTER ROLE service_role SET statement_timeout = '120s';
