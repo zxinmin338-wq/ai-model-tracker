@@ -15,9 +15,13 @@
 -- ⚠️ If CREATE MATERIALIZED VIEW times out (cold get_ranking_7d), just run this
 -- block again — the first (failed) attempt warms the buffers, the second succeeds.
 
--- The SQL editor session's search_path may not include public, so the inlined
--- `FROM snapshots` inside get_ranking_7d() fails to resolve. Set it explicitly.
-SET search_path TO public, extensions;
+-- get_ranking_7d/breakdown have no fixed search_path, so their inlined
+-- `FROM snapshots` only resolves under the PostgREST role's search_path — it
+-- fails in the SQL editor / matview creation. Bake search_path into the
+-- functions so they resolve public.snapshots regardless of caller (also what
+-- Supabase's security linter recommends; no logic change).
+ALTER FUNCTION public.get_ranking_7d() SET search_path = public;
+ALTER FUNCTION public.get_ranking_breakdown_7d() SET search_path = public;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS public.ranking_7d_mv AS
   SELECT * FROM public.get_ranking_7d();
